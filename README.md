@@ -14,7 +14,7 @@ cursor.
 ## Develop
 
 ```sh
-swift test     # run the unit tests (overlay placement + timing)
+swift test     # run the unit tests (placement, timing, lines, shuffle bag)
 swift build    # build everything
 ```
 
@@ -45,17 +45,19 @@ open build/Anear.app
 ```
 
 Either way you get a menu-bar item titled **Anear** with **Preview** and
-**Quit** — no Dock icon. **Preview** shows a fading pill of text
-("I begin again.") pinned near the cursor: it holds for ~4s, fades out over
-~1.25s, never takes focus, and lets clicks pass through to whatever is under
-it.
+**Quit** — no Dock icon. **Preview** shows the next line from a shuffle bag
+over your lines (the eight-line first-person starter pack until you edit
+them), as a fading pill pinned near the cursor: it holds for ~4s, fades out
+over ~1.25s, never takes focus, and lets clicks pass through to whatever is
+under it.
 
 ## Status
 
 - [x] SPM package: `AnearCore` library + `Anear` executable
 - [x] Cursor-overlay placement math (flips + clamping), unit tested
 - [x] Overlay panel + fade (Preview menu item)
-- [ ] Line store + shuffle bag
+- [x] Line store (UserDefaults) + shuffle bag (starter pack lines, no
+      immediate repeat), unit tested
 - [ ] Presence-gated scheduler + Pause
 - [ ] Edit Lines window + login item
 

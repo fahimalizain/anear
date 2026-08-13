@@ -9,6 +9,9 @@ APP="build/Anear.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/Anear "$APP/Contents/MacOS/Anear"
+cp Assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+cp Assets/MenuBarTemplate.png "$APP/Contents/Resources/MenuBarTemplate.png"
+cp Assets/MenuBarTemplate@2x.png "$APP/Contents/Resources/MenuBarTemplate@2x.png"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -16,6 +19,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key><string>Anear</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundleIdentifier</key><string>dev.fahim.anear</string>
     <key>CFBundleName</key><string>Anear</string>
     <key>CFBundlePackageType</key><string>APPL</string>

@@ -1,5 +1,9 @@
 # Anear
 
+<img src="Assets/AppIcon.png" width="128" alt="Anear">
+
+The mark is a rounded charcoal bar with a near-dot beside it.
+
 Ambient first-person lines that appear near your cursor on macOS — like flavor
 text from a first-person game, but for your desktop. **Work in progress.**
 
@@ -46,9 +50,10 @@ or build a proper .app bundle (menu-bar item, `LSUIElement`, ad-hoc signed):
 open build/Anear.app
 ```
 
-Either way you get a menu-bar item titled **Anear** (or **Anear · paused**)
-with **Pause**, **Preview**, **Edit Lines…**, **Start at Login**, and
-**Quit** — no Dock icon. Every 8–20 minutes
+Either way you get a menu-bar icon — the bar with the near-dot, dimmed
+while paused — with **Pause**, **Preview**, **Edit Lines…**, **Start at
+Login**, and **Quit** — no Dock icon. Hover the icon for the **Anear**
+(or **Anear · paused**) tooltip. Every 8–20 minutes
 of *active* time a scheduler deals the next line from a shuffle bag and
 shows the fading pill; it stays silent while you are idle, the screen is
 locked or asleep, the screensaver is running, or secure input is active.

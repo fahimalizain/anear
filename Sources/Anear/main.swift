@@ -45,6 +45,7 @@ final class MenuActions: NSObject {
     private var timer: Timer?
     /// Wired after the status item and menu are created below.
     weak var statusItem: NSStatusItem?
+    weak var countdownItem: NSMenuItem?
     weak var pauseItem: NSMenuItem?
     weak var loginItem: NSMenuItem?
     /// Created on first use, owned for the process lifetime. The window's
@@ -82,7 +83,8 @@ final class MenuActions: NSObject {
     }
 
     /// One tick per second on the main run loop. Fires a line exactly when
-    /// the scheduler's countdown completes and presence says it is safe.
+    /// the scheduler's countdown completes and presence says it is safe;
+    /// the tick also refreshes the countdown item in the status menu.
     private func startTimer() {
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             self?.schedulerTick()
@@ -93,9 +95,9 @@ final class MenuActions: NSObject {
     }
 
     private func schedulerTick() {
-        guard scheduler.tick(isPresent: presence.isPresent),
-            let text = bag.next(from: lines.map(\.text))
-        else { return }
+        let fired = scheduler.tick(isPresent: presence.isPresent)
+        updateTitles()
+        guard fired, let text = bag.next(from: lines.map(\.text)) else { return }
         overlay.show(text: text, followCursor: config.followCursor)
     }
 
@@ -107,15 +109,22 @@ final class MenuActions: NSObject {
     }
 
     /// Reflects scheduler state in the status tooltip, the dimmed state of
-    /// the status button, and the Pause item title. Called on toggle and
-    /// once at launch (sticky pause). The button shows the template glyph,
-    /// never a title, so the paused state is carried by `appearsDisabled`
-    /// and the tooltip instead.
+    /// the status button, the Pause item title, and the top countdown item.
+    /// Called on toggle, once at launch (sticky pause), every tick, and
+    /// whenever the menu opens. The button shows the template glyph, never
+    /// a title, so the paused state is carried by `appearsDisabled` and the
+    /// tooltip instead. While paused the countdown item reads "Paused"
+    /// rather than the leftover seconds: those are the discarded wait that
+    /// resume throws away when it rolls a fresh interval.
     func updateTitles() {
         let paused = scheduler.isPaused
         statusItem?.button?.toolTip = paused ? "Anear · paused" : "Anear"
         statusItem?.button?.appearsDisabled = paused
         pauseItem?.title = paused ? "Resume" : "Pause"
+        countdownItem?.title =
+            paused
+            ? "Paused"
+            : "Next in \(CountdownFormat.display(seconds: scheduler.remainingSeconds))"
     }
 
     @objc func preview(_ sender: Any?) {
@@ -175,9 +184,11 @@ final class MenuActions: NSObject {
 }
 
 extension MenuActions: NSMenuDelegate {
-    /// Refresh the Start at Login checkbox every time the menu opens; the
-    /// status can change out from under us (System Settings, etc.).
+    /// Refresh the countdown item and the Start at Login checkbox every time
+    /// the menu opens; the countdown can tick under a mouse-hover and the
+    /// login status can change out from under us (System Settings, etc.).
     func menuNeedsUpdate(_ menu: NSMenu) {
+        updateTitles()
         updateLoginItem()
     }
 }
@@ -219,6 +230,13 @@ menuActions.statusItem = statusItem
 
 let menu = NSMenu()
 menu.delegate = menuActions
+// Read-only countdown of the wait until the next line; the 1 Hz tick keeps
+// its title fresh. Disabled: it has no action, so it is display only.
+let countdownItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+countdownItem.isEnabled = false
+menu.addItem(countdownItem)
+menuActions.countdownItem = countdownItem
+menu.addItem(.separator())
 let pauseItem = NSMenuItem(
     title: "Pause",
     action: #selector(MenuActions.togglePause(_:)),

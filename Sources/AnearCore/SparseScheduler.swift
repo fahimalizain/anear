@@ -52,6 +52,14 @@ public struct SparseScheduler: Sendable {
         lastTick = now()
     }
 
+    /// Rolls a fresh interval from now and restarts the countdown, so a
+    /// changed interval generator (e.g. new config bounds) applies
+    /// immediately. Never fires by itself.
+    public mutating func resetCountdown() {
+        remaining = nextInterval()
+        lastTick = now()
+    }
+
     /// Advance the scheduler one step using the injected clock.
     ///
     /// - `isPresent == false` freezes the remaining countdown: no drain, no

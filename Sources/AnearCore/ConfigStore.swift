@@ -6,10 +6,8 @@ import Foundation
 /// Load precedence:
 /// 1. The JSON file, if it exists and decodes (validated; empty lines fall
 ///    back to the starter pack).
-/// 2. The legacy UserDefaults lines (`anear.lines`), migrated from the
-///    pre-JSON `UserDefaultsLineStore` — with default 8/20 bounds. Loading
-///    never writes the file; only `save` does.
-/// 3. Fresh install: starter pack + 8/20.
+/// 2. Otherwise: fresh install — starter pack + 8/20. Loading never writes
+///    the file; only `save` does.
 public struct ConfigStore: Sendable {
     public let fileURL: URL
 
@@ -25,7 +23,7 @@ public struct ConfigStore: Sendable {
             .appendingPathComponent("config.json", isDirectory: false)
     }
 
-    public func load(migratingFrom defaults: UserDefaults = .standard) -> AnearConfig {
+    public func load() -> AnearConfig {
         // 1. Existing file wins: decode, clamp minutes, restore starter
         //    lines when the saved list is empty.
         if let data = try? Data(contentsOf: fileURL),
@@ -38,19 +36,7 @@ public struct ConfigStore: Sendable {
             return config
         }
 
-        // 2. Legacy migration: the user's lines from UserDefaults with the
-        //    default 8/20 bounds. Falls back to the starter pack when the
-        //    key is missing, empty, or undecodable.
-        let legacyLines = UserDefaultsLineStore(defaults: defaults).load()
-        if !legacyLines.isEmpty {
-            return AnearConfig(
-                lines: legacyLines,
-                minIntervalMinutes: 8,
-                maxIntervalMinutes: 20
-            )
-        }
-
-        // 3. Fresh install.
+        // 2. File missing or undecodable: starter pack + 8/20.
         return AnearConfig()
     }
 

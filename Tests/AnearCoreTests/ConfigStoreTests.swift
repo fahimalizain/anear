@@ -27,6 +27,7 @@ struct ConfigStoreTests {
             #expect(config.minIntervalMinutes == 8)
             #expect(config.maxIntervalMinutes == 20)
             #expect(config.followCursor == false)
+            #expect(config.holdSeconds == 4)
             // Loading must not create the file.
             #expect(FileManager.default.fileExists(atPath: fileURL.path) == false)
         }
@@ -41,7 +42,8 @@ struct ConfigStoreTests {
                 ],
                 minIntervalMinutes: 5,
                 maxIntervalMinutes: 30,
-                followCursor: true
+                followCursor: true,
+                holdSeconds: 7
             )
 
             try store.save(config)
@@ -64,6 +66,38 @@ struct ConfigStoreTests {
 
             #expect(loaded.minIntervalMinutes == 1)
             #expect(loaded.maxIntervalMinutes == 1)  // never below min
+        }
+    }
+
+    @Test func saveClampsInvalidHoldSeconds() throws {
+        try withStore { store, _ in
+            let invalid = AnearConfig(
+                lines: [Line(text: "x")],
+                minIntervalMinutes: 5,
+                maxIntervalMinutes: 30,
+                holdSeconds: 0
+            )
+
+            try store.save(invalid)
+            let loaded = store.load()
+
+            #expect(loaded.holdSeconds == 1)
+        }
+    }
+
+    @Test func saveClampsNegativeHoldSeconds() throws {
+        try withStore { store, _ in
+            let invalid = AnearConfig(
+                lines: [Line(text: "x")],
+                minIntervalMinutes: 5,
+                maxIntervalMinutes: 30,
+                holdSeconds: -3
+            )
+
+            try store.save(invalid)
+            let loaded = store.load()
+
+            #expect(loaded.holdSeconds == 1)
         }
     }
 
@@ -90,6 +124,29 @@ struct ConfigStoreTests {
         }
     }
 
+    @Test func loadClampsInvalidHoldSecondsInHandWrittenFile() throws {
+        try withStore { store, fileURL in
+            let json = """
+                {
+                  "lines" : [
+                    {
+                      "id" : "11111111-1111-1111-1111-111111111111",
+                      "text" : "hi"
+                    }
+                  ],
+                  "minIntervalMinutes" : 3,
+                  "maxIntervalMinutes" : 7,
+                  "holdSeconds" : 0
+                }
+                """
+            try Data(json.utf8).write(to: fileURL)
+
+            let loaded = store.load()
+
+            #expect(loaded.holdSeconds == 1)
+        }
+    }
+
     @Test func loadsHandWrittenFileWithoutFollowCursorKey() throws {
         try withStore { store, fileURL in
             // Config files written before `followCursor` existed carry no
@@ -112,6 +169,7 @@ struct ConfigStoreTests {
             let loaded = store.load()
 
             #expect(loaded.followCursor == false)
+            #expect(loaded.holdSeconds == 4)
             #expect(
                 loaded.lines
                     == [
@@ -123,6 +181,36 @@ struct ConfigStoreTests {
             )
             #expect(loaded.minIntervalMinutes == 3)
             #expect(loaded.maxIntervalMinutes == 7)
+        }
+    }
+
+    @Test func loadsHandWrittenFileWithoutHoldSecondsKey() throws {
+        try withStore { store, fileURL in
+            // Config files written before `holdSeconds` existed carry no
+            // such key; they must still decode, keeping lines and minutes,
+            // with holdSeconds defaulting to OverlayTiming.holdDuration (4).
+            let json = """
+                {
+                  "lines" : [
+                    {
+                      "id" : "11111111-1111-1111-1111-111111111111",
+                      "text" : "hi"
+                    }
+                  ],
+                  "minIntervalMinutes" : 3,
+                  "maxIntervalMinutes" : 7,
+                  "followCursor" : true
+                }
+                """
+            try Data(json.utf8).write(to: fileURL)
+
+            let loaded = store.load()
+
+            #expect(loaded.holdSeconds == 4)
+            #expect(loaded.followCursor == true)
+            #expect(loaded.minIntervalMinutes == 3)
+            #expect(loaded.maxIntervalMinutes == 7)
+            #expect(loaded.lines.count == 1)
         }
     }
 

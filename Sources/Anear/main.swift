@@ -53,8 +53,12 @@ final class MenuActions: NSObject {
     private lazy var configWindow = ConfigWindow(
         fileURL: configStore.fileURL,
         onSave: { [weak self] config in self?.saveConfig(config) },
-        onPreview: { [weak self] text, followCursor in
-            self?.overlay.show(text: text, followCursor: followCursor)
+        onPreview: { [weak self] text, followCursor, holdDuration in
+            self?.overlay.show(
+                text: text,
+                followCursor: followCursor,
+                holdDuration: holdDuration
+            )
         }
     )
 
@@ -98,7 +102,11 @@ final class MenuActions: NSObject {
         let fired = scheduler.tick(isPresent: presence.isPresent)
         updateTitles()
         guard fired, let text = bag.next(from: lines.map(\.text)) else { return }
-        overlay.show(text: text, followCursor: config.followCursor)
+        overlay.show(
+            text: text,
+            followCursor: config.followCursor,
+            holdDuration: config.holdDuration
+        )
     }
 
     @objc func togglePause(_ sender: Any?) {
@@ -129,7 +137,11 @@ final class MenuActions: NSObject {
 
     @objc func preview(_ sender: Any?) {
         if let text = bag.next(from: lines.map(\.text)) {
-            overlay.show(text: text, followCursor: config.followCursor)
+            overlay.show(
+                text: text,
+                followCursor: config.followCursor,
+                holdDuration: config.holdDuration
+            )
         }
     }
 

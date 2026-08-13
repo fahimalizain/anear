@@ -69,7 +69,9 @@ attempted once and never retried) and can be toggled any time afterwards.
 The login item only sticks when Anear runs as a proper app bundle —
 `build/Anear.app` via `make-app.sh`, or an Anear.app copied to
 `/Applications`. A raw `swift run Anear` process is not an app bundle and
-cannot register a durable login item.
+cannot register a durable login item; the first-launch auto-enable also
+only happens when Anear is launched as `Anear.app`, so `swift run` never
+consumes the one-shot flag.
 
 ## Status
 

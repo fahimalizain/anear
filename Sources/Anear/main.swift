@@ -104,10 +104,13 @@ final class MenuActions: NSObject {
 
     /// Registers the app as a login item exactly once, on first launch, so
     /// Start at Login is on by default. Deliberately one-shot: even a failed
-    /// `register()` sets the flag, so we never retry-spam.
+    /// `register()` sets the flag, so we never retry-spam. Only a real
+    /// `.app` bundle may consume the flag — a bare executable (`swift run`)
+    /// must not, or it would permanently disable the default for the app.
     private func registerLoginItemOnFirstLaunch() {
         let flagKey = "anear.didSetLoginItem"
         guard !UserDefaults.standard.bool(forKey: flagKey) else { return }
+        guard Bundle.main.bundleURL.pathExtension == "app" else { return }
         try? SMAppService.mainApp.register()
         UserDefaults.standard.set(true, forKey: flagKey)
     }

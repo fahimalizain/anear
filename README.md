@@ -46,7 +46,8 @@ open build/Anear.app
 ```
 
 Either way you get a menu-bar item titled **Anear** (or **Anear · paused**)
-with **Pause**, **Preview**, and **Quit** — no Dock icon. Every 8–20 minutes
+with **Pause**, **Preview**, **Edit Lines…**, **Start at Login**, and
+**Quit** — no Dock icon. Every 8–20 minutes
 of *active* time a scheduler deals the next line from a shuffle bag and
 shows the fading pill; it stays silent while you are idle, the screen is
 locked or asleep, the screensaver is running, or secure input is active.
@@ -57,6 +58,21 @@ them), as a fading pill pinned near the cursor: it holds for ~4s, fades out
 over ~1.25s, never takes focus, and lets clicks pass through to whatever is
 under it.
 
+**Edit Lines…** opens a small window with the current lines, one first-person
+line per row. **Preview** in the editor shows the last non-empty line of the
+draft as a fading pill; **Save** parses the draft, persists it, and reloads
+the in-memory pool (Save is explicit — closing the window never saves).
+
+**Start at Login** is a checkbox backed by `SMAppService.mainApp`: it is
+turned **on by default** after first launch (the one-time registration is
+attempted once and never retried) and can be toggled any time afterwards.
+The login item only sticks when Anear runs as a proper app bundle —
+`build/Anear.app` via `make-app.sh`, or an Anear.app copied to
+`/Applications`. A raw `swift run Anear` process is not an app bundle and
+cannot register a durable login item; the first-launch auto-enable also
+only happens when Anear is launched as `Anear.app`, so `swift run` never
+consumes the one-shot flag.
+
 ## Status
 
 - [x] SPM package: `AnearCore` library + `Anear` executable
@@ -66,7 +82,8 @@ under it.
       immediate repeat), unit tested
 - [x] Presence-gated sparse scheduler (idle/lock/screensaver/sleep/secure
       input aware) + sticky Pause, unit tested with a fake clock
-- [ ] Edit Lines window + login item
+- [x] Edit Lines window (one line per row, Save + Preview) + Start at Login
+      (SMAppService, on by default after first launch)
 
 ## License
 

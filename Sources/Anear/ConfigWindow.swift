@@ -4,11 +4,12 @@ import SwiftUI
 
 /// The Config window: a real titled, closable, resizable window — not a
 /// non-activating panel — so the user can actually type. Edits the ambient
-/// lines and the 8–20 minute interval, shows the JSON config file path, and
-/// persists both on Save. Save also closes the window (a deliberate change
-/// from the old Edit Lines window); Preview shows the last non-empty draft
-/// line without saving or closing. Reused for the process lifetime: closing
-/// it via the red traffic light only hides it.
+/// lines, the 8–20 minute interval, and the follow-cursor toggle, shows the
+/// JSON config file path, and persists them on Save. Save also closes the
+/// window (a deliberate change from the old Edit Lines window); Preview
+/// shows the last non-empty draft line without saving or closing. Reused
+/// for the process lifetime: closing it via the red traffic light only
+/// hides it.
 final class ConfigWindow: NSWindow {
     private let fileURL: URL
     private let onSave: (AnearConfig) -> Void
@@ -54,13 +55,14 @@ final class ConfigWindow: NSWindow {
         orderOut(nil)
     }
 
-    /// Loads `config` into the editor and the minute fields and brings the
-    /// window forward. This is the one place the app activates itself; the
-    /// HUD never does.
+    /// Loads `config` into the editor, the minute fields, and the
+    /// follow-cursor toggle, then brings the window forward. This is the
+    /// one place the app activates itself; the HUD never does.
     func show(config: AnearConfig) {
         model.text = LineDraft.render(config.lines)
         model.minMinutes = String(config.minIntervalMinutes)
         model.maxMinutes = String(config.maxIntervalMinutes)
+        model.followCursor = config.followCursor
         model.fileExists = FileManager.default.fileExists(atPath: fileURL.path)
         NSApp.activate(ignoringOtherApps: true)
         makeKeyAndOrderFront(nil)
@@ -72,6 +74,9 @@ final class ConfigModel: ObservableObject {
     @Published var text: String = ""
     @Published var minMinutes: String = ""
     @Published var maxMinutes: String = ""
+    /// Whether the pill should follow the pointer while visible; loaded from
+    /// the config on show, persisted on Save.
+    @Published var followCursor: Bool = false
     /// Whether the config file exists right now; drives the Reveal button
     /// and the "Created on Save." caption.
     @Published var fileExists: Bool
@@ -91,15 +96,16 @@ final class ConfigModel: ObservableObject {
         self.onPreview = onPreview
     }
 
-    /// Parses the draft and the minute fields into a config and hands it to
-    /// the caller, which persists and closes the window. Unparseable minute
-    /// fields fall back to the defaults (8/20); `ConfigStore.save` clamps
-    /// anything invalid.
+    /// Parses the draft, the minute fields, and the follow-cursor toggle
+    /// into a config and hands it to the caller, which persists and closes
+    /// the window. Unparseable minute fields fall back to the defaults
+    /// (8/20); `ConfigStore.save` clamps anything invalid.
     func save() {
         let config = AnearConfig(
             lines: LineDraft.parse(text),
             minIntervalMinutes: Int(minMinutes) ?? 8,
-            maxIntervalMinutes: Int(maxMinutes) ?? 20
+            maxIntervalMinutes: Int(maxMinutes) ?? 20,
+            followCursor: followCursor
         )
         onSave(config)
     }
@@ -118,14 +124,15 @@ final class ConfigModel: ObservableObject {
     }
 }
 
-/// The config content: interval bounds, the line editor, the config file
-/// path, and Preview (left) / Save (right).
+/// The config content: interval bounds, the follow-cursor toggle, the line
+/// editor, the config file path, and Preview (left) / Save (right).
 struct ConfigView: View {
     @ObservedObject var model: ConfigModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             intervalSection
+            followCursorSection
             linesSection
             pathSection
             buttonRow
@@ -150,6 +157,18 @@ struct ConfigView: View {
                     .frame(width: 52)
                 Text("minutes")
             }
+        }
+    }
+
+    /// Whether the pill follows the pointer while visible. The overlay
+    /// tracks the mouse only when this is on; the default keeps the pill
+    /// pinned where it spawns.
+    private var followCursorSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle("Follow cursor", isOn: $model.followCursor)
+            Text("Move the pill with the pointer while it is visible.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 

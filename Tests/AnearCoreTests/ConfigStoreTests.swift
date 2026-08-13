@@ -26,12 +26,13 @@ struct ConfigStoreTests {
             #expect(config.lines == StarterPack.lines)
             #expect(config.minIntervalMinutes == 8)
             #expect(config.maxIntervalMinutes == 20)
+            #expect(config.followCursor == false)
             // Loading must not create the file.
             #expect(FileManager.default.fileExists(atPath: fileURL.path) == false)
         }
     }
 
-    @Test func saveThenLoadRoundTripsLinesAndMinutes() throws {
+    @Test func saveThenLoadRoundTripsConfig() throws {
         try withStore { store, fileURL in
             let config = AnearConfig(
                 lines: [
@@ -39,7 +40,8 @@ struct ConfigStoreTests {
                     Line(id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!, text: "B."),
                 ],
                 minIntervalMinutes: 5,
-                maxIntervalMinutes: 30
+                maxIntervalMinutes: 30,
+                followCursor: true
             )
 
             try store.save(config)
@@ -85,6 +87,42 @@ struct ConfigStoreTests {
 
             #expect(loaded.minIntervalMinutes == 1)
             #expect(loaded.maxIntervalMinutes == 3)
+        }
+    }
+
+    @Test func loadsHandWrittenFileWithoutFollowCursorKey() throws {
+        try withStore { store, fileURL in
+            // Config files written before `followCursor` existed carry no
+            // such key; they must still decode, keeping lines and minutes,
+            // with followCursor defaulting to false.
+            let json = """
+                {
+                  "lines" : [
+                    {
+                      "id" : "11111111-1111-1111-1111-111111111111",
+                      "text" : "hi"
+                    }
+                  ],
+                  "minIntervalMinutes" : 3,
+                  "maxIntervalMinutes" : 7
+                }
+                """
+            try Data(json.utf8).write(to: fileURL)
+
+            let loaded = store.load()
+
+            #expect(loaded.followCursor == false)
+            #expect(
+                loaded.lines
+                    == [
+                        Line(
+                            id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
+                            text: "hi"
+                        )
+                    ]
+            )
+            #expect(loaded.minIntervalMinutes == 3)
+            #expect(loaded.maxIntervalMinutes == 7)
         }
     }
 

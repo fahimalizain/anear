@@ -23,6 +23,7 @@ let package = Package(
             name: "Anear",
             dependencies: ["AnearCore"],
             path: "Sources/Anear",
+            resources: [.process("Resources")],
             linkerSettings: [
                 .linkedFramework("AppKit"),
                 .linkedFramework("SwiftUI"),

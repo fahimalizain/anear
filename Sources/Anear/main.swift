@@ -77,11 +77,15 @@ final class MenuActions: NSObject {
         updateTitles()
     }
 
-    /// Reflects scheduler state in the status title and the Pause item
-    /// title. Called on toggle and once at launch (sticky pause).
+    /// Reflects scheduler state in the status tooltip, the dimmed state of
+    /// the status button, and the Pause item title. Called on toggle and
+    /// once at launch (sticky pause). The button shows the template glyph,
+    /// never a title, so the paused state is carried by `appearsDisabled`
+    /// and the tooltip instead.
     func updateTitles() {
         let paused = scheduler.isPaused
-        statusItem?.button?.title = paused ? "Anear · paused" : "Anear"
+        statusItem?.button?.toolTip = paused ? "Anear · paused" : "Anear"
+        statusItem?.button?.appearsDisabled = paused
         pauseItem?.title = paused ? "Resume" : "Pause"
     }
 
@@ -142,8 +146,37 @@ extension MenuActions: NSMenuDelegate {
 
 let menuActions = MenuActions()
 
+/// The menu-bar glyph: a bar with a near-dot, keyed to black + alpha for
+/// template rendering. `Bundle.module` serves the SPM resources under
+/// `swift run`; the packaged `.app` falls back to the PNGs that
+/// `make-app.sh` copies into `Bundle.main`'s Resources. Both 1x and @2x
+/// representations are attached so the icon stays crisp on retina.
+private func menuBarTemplateImage() -> NSImage? {
+    let image = NSImage(size: NSSize(width: 18, height: 18))
+    var found = false
+    for bundle in [Bundle.module, Bundle.main] {
+        for name in ["MenuBarTemplate@2x", "MenuBarTemplate"] {
+            guard let url = bundle.url(forResource: name, withExtension: "png"),
+                let representation = NSImage(contentsOf: url)?.representations.first
+            else { continue }
+            representation.size = NSSize(width: 18, height: 18)
+            image.addRepresentation(representation)
+            found = true
+        }
+    }
+    return found ? image : nil
+}
+
 let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-statusItem.button?.title = "Anear"
+if let image = menuBarTemplateImage() {
+    image.isTemplate = true
+    image.size = NSSize(width: 18, height: 18)
+    statusItem.button?.image = image
+    statusItem.button?.title = ""
+} else {
+    // Resources missing (unlikely): fall back to the wordmark.
+    statusItem.button?.title = "Anear"
+}
 menuActions.statusItem = statusItem
 
 let menu = NSMenu()

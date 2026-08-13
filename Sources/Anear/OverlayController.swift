@@ -5,7 +5,9 @@ import QuartzCore
 /// Owns the overlay panel and its show/hold/fade lifecycle. The panel is
 /// created once and reused; each `show` pins the pill at the current cursor
 /// location — or, with `followCursor`, tracks the pointer for the pill's
-/// whole visible life — and restarts the hold and fade.
+/// whole visible life — and restarts the hold and fade. The hold is passed
+/// per call (defaulting to `OverlayTiming.holdDuration`); the fade is always
+/// the `OverlayTiming.fadeDuration` product constant.
 final class OverlayController {
     private let panel: OverlayPanel
     private var fadeWork: DispatchWorkItem?
@@ -27,12 +29,17 @@ final class OverlayController {
         stopTracking()
     }
 
-    /// Shows a pill of `text` near the current cursor location, holds it,
-    /// then fades it out. With `followCursor` the pill follows the pointer
-    /// for its whole visible life (local monitor for this app's windows,
-    /// global for everyone else); without it, the pill stays pinned where
-    /// it spawned. A call while the pill is visible restarts the cycle.
-    func show(text: String, followCursor: Bool = false) {
+    /// Shows a pill of `text` near the current cursor location, holds it for
+    /// `holdDuration`, then fades it out. With `followCursor` the pill
+    /// follows the pointer for its whole visible life (local monitor for
+    /// this app's windows, global for everyone else); without it, the pill
+    /// stays pinned where it spawned. A call while the pill is visible
+    /// restarts the cycle.
+    func show(
+        text: String,
+        followCursor: Bool = false,
+        holdDuration: TimeInterval = OverlayTiming.holdDuration
+    ) {
         // Restart the cycle: drop pending fade work and snap back to full
         // opacity (also cuts any in-flight fade animation). Stop tracking
         // too, before optionally restarting it, so a restart can never
@@ -65,7 +72,7 @@ final class OverlayController {
         }
         fadeWork = work
         DispatchQueue.main.asyncAfter(
-            deadline: .now() + OverlayTiming.holdDuration,
+            deadline: .now() + holdDuration,
             execute: work
         )
     }

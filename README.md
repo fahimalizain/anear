@@ -14,7 +14,7 @@ cursor.
 ## Develop
 
 ```sh
-swift test     # run the unit tests (overlay placement math)
+swift test     # run the unit tests (overlay placement + timing)
 swift build    # build everything
 ```
 
@@ -44,14 +44,17 @@ or build a proper .app bundle (menu-bar item, `LSUIElement`, ad-hoc signed):
 open build/Anear.app
 ```
 
-Either way you get a menu-bar item titled **Anear** with a **Quit** menu — no
-Dock icon.
+Either way you get a menu-bar item titled **Anear** with **Preview** and
+**Quit** — no Dock icon. **Preview** shows a fading pill of text
+("I begin again.") pinned near the cursor: it holds for ~4s, fades out over
+~1.25s, never takes focus, and lets clicks pass through to whatever is under
+it.
 
 ## Status
 
 - [x] SPM package: `AnearCore` library + `Anear` executable
 - [x] Cursor-overlay placement math (flips + clamping), unit tested
-- [ ] Overlay panel + fade
+- [x] Overlay panel + fade (Preview menu item)
 - [ ] Line store + shuffle bag
 - [ ] Presence-gated scheduler + Pause
 - [ ] Edit Lines window + login item

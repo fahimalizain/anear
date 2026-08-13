@@ -25,6 +25,7 @@ let package = Package(
             path: "Sources/Anear",
             linkerSettings: [
                 .linkedFramework("AppKit"),
+                .linkedFramework("SwiftUI"),
             ]
         ),
         .testTarget(

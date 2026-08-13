@@ -1,6 +1,6 @@
+import AnearCore
 import AppKit
 import SwiftUI
-import AnearCore
 
 /// The pill content: one line of text on a HUD-material capsule. Text wraps
 /// up to `OverlayGeometry.maxWidth` instead of running on one endless line.
@@ -36,7 +36,7 @@ final class OverlayPanel: NSPanel {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
-        ignoresMouseEvents = true // click-through: zero interaction
+        ignoresMouseEvents = true  // click-through: zero interaction
         hidesOnDeactivate = false
         isExcludedFromWindowsMenu = true
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]

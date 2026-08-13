@@ -19,7 +19,8 @@ public struct ShuffleBag: Sendable {
     /// Trims whitespace and drops empty lines, then deals the next line.
     /// Returns nil when the cleaned pool is empty.
     public mutating func next(from lines: [String]) -> String? {
-        let pool = lines
+        let pool =
+            lines
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         guard !pool.isEmpty else { return nil }
@@ -46,9 +47,10 @@ public struct ShuffleBag: Sendable {
         // opens with lastDealt, some later index holds a different line —
         // swap it to the front to break the immediate repeat.
         if pool.count >= 2,
-           let lastDealt,
-           deck.first == lastDealt,
-           let swapIndex = deck.firstIndex(where: { $0 != lastDealt }) {
+            let lastDealt,
+            deck.first == lastDealt,
+            let swapIndex = deck.firstIndex(where: { $0 != lastDealt })
+        {
             deck.swapAt(0, swapIndex)
         }
     }

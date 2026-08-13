@@ -1,6 +1,6 @@
+import AnearCore
 import AppKit
 import QuartzCore
-import AnearCore
 
 /// Owns the overlay panel and its show/hold/fade lifecycle. The panel is
 /// created once and reused; each `show` pins the pill at the current cursor
@@ -43,7 +43,7 @@ final class OverlayController {
             panelSize: panel.frame.size,
             visibleFrame: visibleFrame
         )
-        panel.setFrameOrigin(placement.origin) // no animation: pinned at spawn
+        panel.setFrameOrigin(placement.origin)  // no animation: pinned at spawn
 
         panel.orderFrontRegardless()
 

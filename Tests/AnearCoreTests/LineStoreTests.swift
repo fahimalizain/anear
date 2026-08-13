@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import AnearCore
 
 struct LineStoreTests {
@@ -31,8 +32,12 @@ struct LineStoreTests {
         try withSuite { defaults in
             let store = UserDefaultsLineStore(defaults: defaults, key: key)
             let custom = [
-                Line(id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!, text: "My own line."),
-                Line(id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!, text: "Another one."),
+                Line(
+                    id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
+                    text: "My own line."),
+                Line(
+                    id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+                    text: "Another one."),
             ]
 
             store.save(custom)

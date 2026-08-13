@@ -17,6 +17,7 @@ cursor.
 swift test     # run the unit tests (placement, timing, lines, shuffle bag,
                # scheduler, pause)
 swift build    # build everything
+swift format lint --strict --recursive --configuration .swift-format Sources Tests Package.swift  # style lint (CI runs the same command)
 ```
 
 > **Command Line Tools only (no Xcode):** a local quirk of this setup — the

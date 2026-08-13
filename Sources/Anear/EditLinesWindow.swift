@@ -1,6 +1,6 @@
+import AnearCore
 import AppKit
 import SwiftUI
-import AnearCore
 
 /// The Edit Lines window: a real titled, closable, resizable window — not a
 /// non-activating panel — so the user can actually type. Reused for the
@@ -26,7 +26,7 @@ final class EditLinesWindow: NSWindow {
             defer: false
         )
         title = "Edit Lines"
-        isReleasedWhenClosed = false // reuse: hide, never release
+        isReleasedWhenClosed = false  // reuse: hide, never release
         contentView = hostingView
         center()
     }

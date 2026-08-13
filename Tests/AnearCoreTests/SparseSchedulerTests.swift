@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import AnearCore
 
 /// SparseScheduler with a fake clock and a fixed interval, so every test is

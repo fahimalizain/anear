@@ -1,6 +1,6 @@
+import AnearCore
 import AppKit
 import Carbon
-import AnearCore
 
 /// Decides whether the human is actually at the machine and it is safe to
 /// show a line. `isPresent` is true only when ALL of:

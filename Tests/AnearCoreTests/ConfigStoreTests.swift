@@ -4,29 +4,23 @@ import Testing
 @testable import AnearCore
 
 /// ConfigStore against a unique temp file per test — never the real
-/// Application Support path — and a fresh UserDefaults suite.
+/// Application Support path.
 struct ConfigStoreTests {
-    /// Runs `body` with a store pointed at a unique temp config file and a
-    /// fresh UserDefaults suite, cleaning both up afterwards.
-    private func withStore(_ body: (ConfigStore, URL, UserDefaults) throws -> Void) throws {
-        let suiteName = "anear.config.tests.\(UUID().uuidString)"
-        guard let defaults = UserDefaults(suiteName: suiteName) else {
-            fatalError("could not create test suite \(suiteName)")
-        }
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-
+    /// Runs `body` with a store pointed at a unique temp config file,
+    /// cleaning it up afterwards.
+    private func withStore(_ body: (ConfigStore, URL) throws -> Void) throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("anear.config.tests.\(UUID().uuidString)", isDirectory: true)
         let fileURL = directory.appendingPathComponent("config.json")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
 
-        try body(ConfigStore(fileURL: fileURL), fileURL, defaults)
+        try body(ConfigStore(fileURL: fileURL), fileURL)
     }
 
-    @Test func missingFileWithEmptyDefaultsLoadsStarterAndWritesNothing() throws {
-        try withStore { store, fileURL, defaults in
-            let config = store.load(migratingFrom: defaults)
+    @Test func missingFileLoadsStarterAndWritesNothing() throws {
+        try withStore { store, fileURL in
+            let config = store.load()
 
             #expect(config == AnearConfig())
             #expect(config.lines == StarterPack.lines)
@@ -37,26 +31,8 @@ struct ConfigStoreTests {
         }
     }
 
-    @Test func missingFileMigratesCustomDefaultsLinesWithoutWriting() throws {
-        try withStore { store, fileURL, defaults in
-            let custom = [
-                Line(id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!, text: "Mine."),
-                Line(id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!, text: "Yours."),
-            ]
-            defaults.set(try JSONEncoder().encode(custom), forKey: "anear.lines")
-
-            let config = store.load(migratingFrom: defaults)
-
-            #expect(config.lines == custom)
-            #expect(config.minIntervalMinutes == 8)
-            #expect(config.maxIntervalMinutes == 20)
-            // Migration must not write the file.
-            #expect(FileManager.default.fileExists(atPath: fileURL.path) == false)
-        }
-    }
-
     @Test func saveThenLoadRoundTripsLinesAndMinutes() throws {
-        try withStore { store, fileURL, defaults in
+        try withStore { store, fileURL in
             let config = AnearConfig(
                 lines: [
                     Line(id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!, text: "A."),
@@ -69,12 +45,12 @@ struct ConfigStoreTests {
             try store.save(config)
 
             #expect(FileManager.default.fileExists(atPath: fileURL.path))
-            #expect(store.load(migratingFrom: defaults) == config)
+            #expect(store.load() == config)
         }
     }
 
     @Test func saveClampsInvalidMinutes() throws {
-        try withStore { store, _, defaults in
+        try withStore { store, _ in
             let invalid = AnearConfig(
                 lines: [Line(text: "x")],
                 minIntervalMinutes: 0,
@@ -82,7 +58,7 @@ struct ConfigStoreTests {
             )
 
             try store.save(invalid)
-            let loaded = store.load(migratingFrom: defaults)
+            let loaded = store.load()
 
             #expect(loaded.minIntervalMinutes == 1)
             #expect(loaded.maxIntervalMinutes == 1)  // never below min
@@ -90,7 +66,7 @@ struct ConfigStoreTests {
     }
 
     @Test func loadClampsInvalidMinutesInHandWrittenFile() throws {
-        try withStore { store, fileURL, defaults in
+        try withStore { store, fileURL in
             let json = """
                 {
                   "lines" : [
@@ -105,7 +81,7 @@ struct ConfigStoreTests {
                 """
             try Data(json.utf8).write(to: fileURL)
 
-            let loaded = store.load(migratingFrom: defaults)
+            let loaded = store.load()
 
             #expect(loaded.minIntervalMinutes == 1)
             #expect(loaded.maxIntervalMinutes == 3)
@@ -113,15 +89,15 @@ struct ConfigStoreTests {
     }
 
     @Test func corruptFileLoadsStarterAndDefaults() throws {
-        try withStore { store, fileURL, defaults in
+        try withStore { store, fileURL in
             try Data("definitely not JSON".utf8).write(to: fileURL)
 
-            #expect(store.load(migratingFrom: defaults) == AnearConfig())
+            #expect(store.load() == AnearConfig())
         }
     }
 
     @Test func saveAllowsEmptyLinesAndLoadRestoresStarter() throws {
-        try withStore { store, fileURL, defaults in
+        try withStore { store, fileURL in
             let empty = AnearConfig(lines: [], minIntervalMinutes: 8, maxIntervalMinutes: 20)
             try store.save(empty)
 
@@ -133,7 +109,7 @@ struct ConfigStoreTests {
             #expect(saved.lines.isEmpty)
 
             // The next load restores the starter pack.
-            let loaded = store.load(migratingFrom: defaults)
+            let loaded = store.load()
             #expect(loaded.lines == StarterPack.lines)
             #expect(loaded.minIntervalMinutes == 8)
             #expect(loaded.maxIntervalMinutes == 20)

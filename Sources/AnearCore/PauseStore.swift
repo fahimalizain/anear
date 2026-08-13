@@ -2,8 +2,7 @@ import Foundation
 
 /// UserDefaults is documented thread-safe but the Command-Line Tools SDK
 /// doesn't mark it `Sendable` (the Xcode SDK does). Box it so the store can
-/// declare `Sendable` cleanly on either toolchain. (Same pattern as
-/// `UserDefaultsLineStore`.)
+/// declare `Sendable` cleanly on either toolchain.
 private struct SendableUserDefaults: @unchecked Sendable {
     let value: UserDefaults
 }

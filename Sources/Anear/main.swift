@@ -11,8 +11,7 @@ import ServiceManagement
 // Pause is sticky across launches; Start at Login registers the app bundle
 // via SMAppService (on by default after first launch). Lines and interval
 // live in `~/Library/Application Support/Anear/config.json` (see
-// `ConfigStore`), with the pre-JSON UserDefaults lines migrating on the
-// first load.
+// `ConfigStore`).
 
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)  // no Dock icon
@@ -57,9 +56,7 @@ final class MenuActions: NSObject {
     )
 
     override init() {
-        // Config comes from the JSON file; the legacy UserDefaults lines
-        // only feed the migration until the first Save writes the file.
-        config = configStore.load(migratingFrom: .standard)
+        config = configStore.load()
         lines = config.lines
         intervalRange.min = config.minIntervalSeconds
         intervalRange.max = config.maxIntervalSeconds

@@ -73,8 +73,7 @@ is explicit — closing the window via the red traffic light never saves).
 Lines and the interval live in a real JSON file at
 `~/Library/Application Support/Anear/config.json` (pretty-printed, created
 on first Save; the window shows its path and can reveal it in Finder).
-The pre-JSON UserDefaults lines migrate into the file on the first load,
-and the pause / start-at-login flags intentionally stay in UserDefaults —
+The pause / start-at-login flags intentionally stay in UserDefaults —
 they are runtime state, not config. The interval takes effect immediately
 on Save; a fresh countdown rolls from the new range.
 
@@ -93,7 +92,7 @@ consumes the one-shot flag.
 - [x] SPM package: `AnearCore` library + `Anear` executable
 - [x] Cursor-overlay placement math (flips + clamping), unit tested
 - [x] Overlay panel + fade (Preview menu item)
-- [x] Line store (UserDefaults) + shuffle bag (starter pack lines, no
+- [x] Config store (JSON file) + shuffle bag (starter pack lines, no
       immediate repeat), unit tested
 - [x] Presence-gated sparse scheduler (idle/lock/screensaver/sleep/secure
       input aware) + sticky Pause, unit tested with a fake clock

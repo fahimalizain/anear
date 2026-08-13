@@ -119,4 +119,37 @@ struct SparseSchedulerTests {
         #expect(scheduler.isPaused == false)
         #expect(scheduler.tick(isPresent: true) == false)
     }
+
+    @Test func resetCountdownAppliesNewIntervalImmediately() {
+        let clock = Clock()
+        let box = IntervalBox(480)
+
+        var scheduler = SparseScheduler(
+            now: { clock.now },
+            nextInterval: { box.value }
+        )
+
+        // 100s into the original 480s interval: no fire.
+        clock.now = 100
+        #expect(scheduler.tick(isPresent: true) == false)
+
+        // The range changes; reset rolls a fresh 10s interval from now.
+        box.value = 10
+        scheduler.resetCountdown()
+        #expect(scheduler.tick(isPresent: true) == false)
+
+        clock.now = 109
+        #expect(scheduler.tick(isPresent: true) == false)
+
+        // A full 10s of present time after the reset → exactly one fire.
+        clock.now = 110
+        #expect(scheduler.tick(isPresent: true) == true)
+    }
+
+    private final class IntervalBox: @unchecked Sendable {
+        var value: TimeInterval
+        init(_ value: TimeInterval) {
+            self.value = value
+        }
+    }
 }

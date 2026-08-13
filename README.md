@@ -18,8 +18,8 @@ cursor.
 ## Develop
 
 ```sh
-swift test     # run the unit tests (placement, timing, lines, shuffle bag,
-               # scheduler, pause)
+swift test     # run the unit tests (placement, timing, lines, config store,
+               # shuffle bag, scheduler, pause)
 swift build    # build everything
 swift format lint --strict --recursive --configuration .swift-format Sources Tests Package.swift  # style lint (CI runs the same command)
 ```
@@ -51,7 +51,7 @@ open build/Anear.app
 ```
 
 Either way you get a menu-bar icon — the bar with the near-dot, dimmed
-while paused — with **Pause**, **Preview**, **Edit Lines…**, **Start at
+while paused — with **Pause**, **Preview**, **Config…**, **Start at
 Login**, and **Quit** — no Dock icon. Hover the icon for the **Anear**
 (or **Anear · paused**) tooltip. Every 8–20 minutes
 of *active* time a scheduler deals the next line from a shuffle bag and
@@ -64,10 +64,19 @@ them), as a fading pill pinned near the cursor: it holds for ~4s, fades out
 over ~1.25s, never takes focus, and lets clicks pass through to whatever is
 under it.
 
-**Edit Lines…** opens a small window with the current lines, one first-person
-line per row. **Preview** in the editor shows the last non-empty line of the
-draft as a fading pill; **Save** parses the draft, persists it, and reloads
-the in-memory pool (Save is explicit — closing the window never saves).
+**Config…** opens a small window with three sections: the interval bounds
+("Every [min] to [max] minutes"), the current lines one first-person line
+per row, and the config file path. **Preview** in the window shows the last
+non-empty line of the draft as a fading pill; **Save** parses the lines and
+minutes, validates them, persists everything, and closes the window (Save
+is explicit — closing the window via the red traffic light never saves).
+Lines and the interval live in a real JSON file at
+`~/Library/Application Support/Anear/config.json` (pretty-printed, created
+on first Save; the window shows its path and can reveal it in Finder).
+The pre-JSON UserDefaults lines migrate into the file on the first load,
+and the pause / start-at-login flags intentionally stay in UserDefaults —
+they are runtime state, not config. The interval takes effect immediately
+on Save; a fresh countdown rolls from the new range.
 
 **Start at Login** is a checkbox backed by `SMAppService.mainApp`: it is
 turned **on by default** after first launch (the one-time registration is
@@ -88,8 +97,9 @@ consumes the one-shot flag.
       immediate repeat), unit tested
 - [x] Presence-gated sparse scheduler (idle/lock/screensaver/sleep/secure
       input aware) + sticky Pause, unit tested with a fake clock
-- [x] Edit Lines window (one line per row, Save + Preview) + Start at Login
-      (SMAppService, on by default after first launch)
+- [x] Config window (lines + interval bounds, JSON file path, Save closes
+      the window) + Start at Login (SMAppService, on by default after first
+      launch)
 
 ## License
 

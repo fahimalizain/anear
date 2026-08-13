@@ -3,27 +3,45 @@ import AppKit
 import ServiceManagement
 
 // Anear — Dock-less menu-bar accessory (`@main`-style top-level code in
-// main.swift). Shows a status item with Pause, Preview, Edit Lines…, Start
-// at Login, and Quit. A presence-gated sparse scheduler deals the next
-// shuffle-bag line every 8–20 minutes of *active* time and shows the fading
-// pill; it stays silent on idle, lock, screensaver, sleep, and secure input.
+// main.swift). Shows a status item with Pause, Preview, Config…, Start at
+// Login, and Quit. A presence-gated sparse scheduler deals the next
+// shuffle-bag line every 8–20 minutes of *active* time (both bounds come
+// from the JSON config file) and shows the fading pill; it stays silent on
+// idle, lock, screensaver, sleep, and secure input.
 // Pause is sticky across launches; Start at Login registers the app bundle
-// via SMAppService (on by default after first launch).
+// via SMAppService (on by default after first launch). Lines and interval
+// live in `~/Library/Application Support/Anear/config.json` (see
+// `ConfigStore`), with the pre-JSON UserDefaults lines migrating on the
+// first load.
 
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)  // no Dock icon
+
+/// The sparse scheduler's interval bounds in seconds. A class (not a value)
+/// so the scheduler's `@Sendable` `nextInterval` closure observes the new
+/// bounds immediately when the Config window saves; `resetCountdown` then
+/// applies them without firing.
+private final class IntervalRange: @unchecked Sendable {
+    var min: TimeInterval
+    var max: TimeInterval
+
+    init(min: TimeInterval, max: TimeInterval) {
+        self.min = min
+        self.max = max
+    }
+}
 
 /// Target for status menu actions. Lives for the process lifetime as a
 /// top-level `let`, so `#selector` always has a valid target.
 final class MenuActions: NSObject {
     let overlay = OverlayController()
-    private let store = UserDefaultsLineStore(defaults: .standard)
+    private let configStore = ConfigStore(fileURL: ConfigStore.defaultFileURL())
+    private let intervalRange = IntervalRange(min: 8 * 60, max: 20 * 60)
     private let pauseStore = PauseStore(defaults: .standard)
+    private var config: AnearConfig
     private var lines: [Line]
     private var bag = ShuffleBag()
-    private var scheduler = SparseScheduler(
-        now: { ProcessInfo.processInfo.systemUptime }
-    )
+    private var scheduler: SparseScheduler
     private let presence = PresenceMonitor()
     private var timer: Timer?
     /// Wired after the status item and menu are created below.
@@ -32,13 +50,25 @@ final class MenuActions: NSObject {
     weak var loginItem: NSMenuItem?
     /// Created on first use, owned for the process lifetime. The window's
     /// closures hold us weakly, so there is no cycle.
-    private lazy var editWindow = EditLinesWindow(
-        onSave: { [weak self] lines in self?.saveLines(lines) },
+    private lazy var configWindow = ConfigWindow(
+        fileURL: configStore.fileURL,
+        onSave: { [weak self] config in self?.saveConfig(config) },
         onPreview: { [weak self] text in self?.overlay.show(text: text) }
     )
 
     override init() {
-        lines = store.load()
+        // Config comes from the JSON file; the legacy UserDefaults lines
+        // only feed the migration until the first Save writes the file.
+        config = configStore.load(migratingFrom: .standard)
+        lines = config.lines
+        intervalRange.min = config.minIntervalSeconds
+        intervalRange.max = config.maxIntervalSeconds
+        // Local so the @Sendable closure can capture it before super.init.
+        let range = intervalRange
+        scheduler = SparseScheduler(
+            now: { ProcessInfo.processInfo.systemUptime },
+            nextInterval: { Double.random(in: range.min...range.max) }
+        )
         super.init()
         // Sticky pause: restore the persisted state before the first tick.
         if pauseStore.load() {
@@ -95,16 +125,25 @@ final class MenuActions: NSObject {
         }
     }
 
-    @objc func editLines(_ sender: Any?) {
-        editWindow.show(lines: lines)
+    @objc func openConfig(_ sender: Any?) {
+        configWindow.show(config: config)
     }
 
-    /// Save from the editor: persist the new list, then swap it into memory.
-    /// The shuffle bag refills on its next deal, because `ShuffleBag.next`
-    /// rebuilds any deck that is not a subset of the current pool.
-    private func saveLines(_ newLines: [Line]) {
-        store.save(newLines)
-        lines = newLines
+    /// Save from the Config window: validate, persist the JSON file, then
+    /// swap the new config into memory. The interval box updates so the
+    /// next countdown rolls from the new range, and `resetCountdown` applies
+    /// it immediately without firing. The shuffle bag refills on its next
+    /// deal, because `ShuffleBag.next` rebuilds any deck that is not a
+    /// subset of the current pool.
+    private func saveConfig(_ newConfig: AnearConfig) {
+        var validated = newConfig
+        validated.validate()
+        try? configStore.save(validated)
+        config = validated
+        lines = validated.lines
+        intervalRange.min = validated.minIntervalSeconds
+        intervalRange.max = validated.maxIntervalSeconds
+        scheduler.resetCountdown()
     }
 
     /// Registers the app as a login item exactly once, on first launch, so
@@ -196,13 +235,13 @@ let previewItem = NSMenuItem(
 )
 previewItem.target = menuActions
 menu.addItem(previewItem)
-let editItem = NSMenuItem(
-    title: "Edit Lines…",
-    action: #selector(MenuActions.editLines(_:)),
+let configItem = NSMenuItem(
+    title: "Config…",
+    action: #selector(MenuActions.openConfig(_:)),
     keyEquivalent: ""
 )
-editItem.target = menuActions
-menu.addItem(editItem)
+configItem.target = menuActions
+menu.addItem(configItem)
 let loginItem = NSMenuItem(
     title: "Start at Login",
     action: #selector(MenuActions.toggleLoginItem(_:)),

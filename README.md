@@ -18,10 +18,18 @@ swift test     # run the unit tests (overlay placement math)
 swift build    # build everything
 ```
 
-> **Command Line Tools only (no Xcode):** the SwiftPM test runner can't discover
-> Swift Testing on its own without Xcode — run
-> `swift test -Xswiftc -F/Library/Developer/CommandLineTools/Library/Developer/Frameworks`
-> so the tests actually execute.
+> **Command Line Tools only (no Xcode):** a local quirk of this setup — the
+> CLT-only toolchain doesn't ship XCTest, and SwiftPM can't find Swift Testing
+> on its own. It is not a package setting: CI (Xcode) runs plain `swift test`.
+> If you hit it, point the compiler at the CLT framework and add the two rpaths
+> the CLT framework needs at runtime:
+>
+> ```sh
+> swift test \
+>   -Xswiftc -F/Library/Developer/CommandLineTools/Library/Developer/Frameworks \
+>   -Xlinker -rpath -Xlinker /Library/Developer/CommandLineTools/Library/Developer/Frameworks \
+>   -Xlinker -rpath -Xlinker /Library/Developer/CommandLineTools/Library/Developer/usr/lib
+> ```
 
 ## Run
 

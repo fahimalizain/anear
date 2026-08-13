@@ -1,15 +1,17 @@
 import Foundation
 
-/// Loads and saves the Anear config (lines + interval bounds +
-/// followCursor) as pretty-printed JSON at
+/// Loads and saves the Anear config (lines, interval bounds, followCursor,
+/// and holdSeconds) as pretty-printed JSON at
 /// `~/Library/Application Support/Anear/config.json`.
 ///
 /// Load precedence:
 /// 1. The JSON file, if it exists and decodes (validated; empty lines fall
 ///    back to the starter pack; a missing `followCursor` key — old config
-///    files — decodes as false).
-/// 2. Otherwise: fresh install — starter pack + 8/20, followCursor off.
-///    Loading never writes the file; only `save` does.
+///    files — decodes as false; a missing `holdSeconds` key — config files
+///    from before that field existed — defaults to
+///    `OverlayTiming.holdDuration`, 4).
+/// 2. Otherwise: fresh install — starter pack + 8/20, followCursor off,
+///    holdSeconds 4. Loading never writes the file; only `save` does.
 public struct ConfigStore: Sendable {
     public let fileURL: URL
 

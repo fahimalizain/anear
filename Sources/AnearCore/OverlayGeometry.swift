@@ -1,5 +1,5 @@
-import Foundation
 import CoreGraphics
+import Foundation
 
 /// Where an overlay panel should be placed relative to the cursor.
 public struct OverlayPlacement: Sendable, Equatable {

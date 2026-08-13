@@ -1,4 +1,5 @@
 import Testing
+
 @testable import AnearCore
 
 struct ShuffleBagTests {
@@ -54,7 +55,7 @@ struct ShuffleBagTests {
 
         #expect(bag.next(from: pool) == "a")
         #expect(bag.next(from: pool) == "b")
-        #expect(bag.next(from: pool) == "c") // last of cycle 1
+        #expect(bag.next(from: pool) == "c")  // last of cycle 1
 
         // First deal of cycle 2 must differ from "c" (swap rule), and the
         // rest of the cycle is still a permutation of the pool.

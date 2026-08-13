@@ -21,8 +21,8 @@ public struct UserDefaultsLineStore: Sendable {
 
     public func load() -> [Line] {
         guard let data = defaults.value.data(forKey: key),
-              let lines = try? JSONDecoder().decode([Line].self, from: data),
-              !lines.isEmpty
+            let lines = try? JSONDecoder().decode([Line].self, from: data),
+            !lines.isEmpty
         else {
             return StarterPack.lines
         }

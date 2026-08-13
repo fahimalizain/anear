@@ -15,3 +15,10 @@ jobs:
         run: swift test
       - name: Build
         run: swift build
+  lint:
+    name: lint
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift format
+        run: swift format lint --strict --recursive --configuration .swift-format Sources Tests Package.swift

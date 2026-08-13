@@ -1,5 +1,5 @@
-import AppKit
 import AnearCore
+import AppKit
 import ServiceManagement
 
 // Anear — Dock-less menu-bar accessory (`@main`-style top-level code in
@@ -11,7 +11,7 @@ import ServiceManagement
 // via SMAppService (on by default after first launch).
 
 let app = NSApplication.shared
-app.setActivationPolicy(.accessory) // no Dock icon
+app.setActivationPolicy(.accessory)  // no Dock icon
 
 /// Target for status menu actions. Lives for the process lifetime as a
 /// top-level `let`, so `#selector` always has a valid target.
@@ -65,7 +65,8 @@ final class MenuActions: NSObject {
 
     private func schedulerTick() {
         guard scheduler.tick(isPresent: presence.isPresent),
-              let text = bag.next(from: lines.map(\.text)) else { return }
+            let text = bag.next(from: lines.map(\.text))
+        else { return }
         overlay.show(text: text)
     }
 
@@ -178,7 +179,8 @@ loginItem.target = menuActions
 menu.addItem(loginItem)
 menuActions.loginItem = loginItem
 menu.addItem(.separator())
-let quitItem = NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+let quitItem = NSMenuItem(
+    title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 menu.addItem(quitItem)
 statusItem.menu = menu
 

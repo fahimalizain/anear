@@ -1,5 +1,6 @@
-import Testing
 import CoreGraphics
+import Testing
+
 @testable import AnearCore
 
 struct OverlayGeometryTests {
@@ -16,10 +17,11 @@ struct OverlayGeometryTests {
         )
 
         #expect(
-            placement.origin == CGPoint(
-                x: cursor.x + OverlayGeometry.offsetX,
-                y: cursor.y - OverlayGeometry.offsetY - panelSize.height
-            )
+            placement.origin
+                == CGPoint(
+                    x: cursor.x + OverlayGeometry.offsetX,
+                    y: cursor.y - OverlayGeometry.offsetY - panelSize.height
+                )
         )
         #expect(placement.flippedHorizontal == false)
         #expect(placement.flippedVertical == false)
@@ -35,10 +37,11 @@ struct OverlayGeometryTests {
         )
 
         #expect(
-            placement.origin == CGPoint(
-                x: cursor.x - OverlayGeometry.offsetX - panelSize.width,
-                y: cursor.y - OverlayGeometry.offsetY - panelSize.height
-            )
+            placement.origin
+                == CGPoint(
+                    x: cursor.x - OverlayGeometry.offsetX - panelSize.width,
+                    y: cursor.y - OverlayGeometry.offsetY - panelSize.height
+                )
         )
         #expect(placement.flippedHorizontal)
         #expect(placement.flippedVertical == false)
@@ -54,10 +57,11 @@ struct OverlayGeometryTests {
         )
 
         #expect(
-            placement.origin == CGPoint(
-                x: cursor.x + OverlayGeometry.offsetX,
-                y: cursor.y + OverlayGeometry.offsetY
-            )
+            placement.origin
+                == CGPoint(
+                    x: cursor.x + OverlayGeometry.offsetX,
+                    y: cursor.y + OverlayGeometry.offsetY
+                )
         )
         #expect(placement.flippedHorizontal == false)
         #expect(placement.flippedVertical)

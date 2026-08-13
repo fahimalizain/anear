@@ -13,7 +13,7 @@ import SwiftUI
 final class ConfigWindow: NSWindow {
     private let fileURL: URL
     private let onSave: (AnearConfig) -> Void
-    private let onPreview: (String) -> Void
+    private let onPreview: (String, Bool) -> Void
     /// Created on first use, owned for the process lifetime. The window's
     /// closures hold us weakly, so there is no cycle. Lazy so `persist` can
     /// reference `self` to close the window on Save.
@@ -27,10 +27,13 @@ final class ConfigWindow: NSWindow {
 
     /// - `onSave`: called with the parsed, validated config when the user
     ///   clicks Save. The window closes immediately afterwards.
-    /// - `onPreview`: called with the last non-empty line of the draft when
-    ///   the user clicks Preview. Not called when the draft has no lines.
+    /// - `onPreview`: called with the last non-empty line of the draft and
+    ///   the draft's follow-cursor toggle when the user clicks Preview, so
+    ///   the toggle can be tried before Save. Not called when the draft
+    ///   has no lines.
     init(
-        fileURL: URL, onSave: @escaping (AnearConfig) -> Void, onPreview: @escaping (String) -> Void
+        fileURL: URL, onSave: @escaping (AnearConfig) -> Void,
+        onPreview: @escaping (String, Bool) -> Void
     ) {
         self.fileURL = fileURL
         self.onSave = onSave
@@ -82,13 +85,13 @@ final class ConfigModel: ObservableObject {
     @Published var fileExists: Bool
     let filePath: String
     private let onSave: (AnearConfig) -> Void
-    private let onPreview: (String) -> Void
+    private let onPreview: (String, Bool) -> Void
 
     init(
         filePath: String,
         fileExists: Bool,
         onSave: @escaping (AnearConfig) -> Void,
-        onPreview: @escaping (String) -> Void
+        onPreview: @escaping (String, Bool) -> Void
     ) {
         self.filePath = filePath
         self.fileExists = fileExists
@@ -111,10 +114,12 @@ final class ConfigModel: ObservableObject {
     }
 
     /// Shows the last non-empty line of the current draft — the
-    /// selected-ish, most recently meaningful row. No-op with no lines.
+    /// selected-ish, most recently meaningful row — with the draft's
+    /// follow-cursor toggle, so the toggle can be tried without saving.
+    /// No-op with no lines.
     func preview() {
         guard let last = LineDraft.parse(text).last else { return }
-        onPreview(last.text)
+        onPreview(last.text, followCursor)
     }
 
     /// Reveals the config file in Finder. Only meaningful when the file

@@ -25,6 +25,11 @@ public struct SparseScheduler: Sendable {
     /// The last `now` observed (init, unpause, or a tick).
     private var lastTick: TimeInterval
 
+    /// Seconds left until the next fire. Frozen while idle (the leftover
+    /// wait resumes). While paused this is the discarded leftover — resume
+    /// rolls a fresh interval — so callers must not treat it as a promise.
+    public var remainingSeconds: TimeInterval { remaining }
+
     /// - Parameters:
     ///   - now: Injected clock in seconds (e.g. `systemUptime`).
     ///   - nextInterval: Rolls the interval for the next fire. Defaults to

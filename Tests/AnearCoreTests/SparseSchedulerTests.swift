@@ -24,6 +24,7 @@ struct SparseSchedulerTests {
         // Init rolls 480s remaining; a tick with zero elapsed must not fire.
         #expect(scheduler.tick(isPresent: true) == false)
         #expect(scheduler.isPaused == false)
+        #expect(scheduler.remainingSeconds == 480)
     }
 
     @Test func firesExactlyWhenTheIntervalElapses() {
@@ -35,6 +36,9 @@ struct SparseSchedulerTests {
 
         clock.now = 480
         #expect(scheduler.tick(isPresent: true) == true)
+
+        // The fire rolled a fresh 480s interval starting at t=480.
+        #expect(scheduler.remainingSeconds == 480)
 
         // A fresh 480s interval started at t=480, so the same instant is
         // back to full remaining and must not fire again.
@@ -66,12 +70,14 @@ struct SparseSchedulerTests {
         // 60s remaining.
         clock.now = 420
         #expect(scheduler.tick(isPresent: true) == false)
+        #expect(scheduler.remainingSeconds == 60)
 
         // 1800s away and still absent: frozen, no fire, no drain.
         clock.now = 2220
         #expect(scheduler.tick(isPresent: false) == false)
         clock.now = 4020
         #expect(scheduler.tick(isPresent: false) == false)
+        #expect(scheduler.remainingSeconds == 60)
 
         // Back: only the leftover 60s count, so exactly one fire — not a
         // burst for the whole absence.

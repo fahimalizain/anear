@@ -14,7 +14,8 @@ cursor.
 ## Develop
 
 ```sh
-swift test     # run the unit tests (placement, timing, lines, shuffle bag)
+swift test     # run the unit tests (placement, timing, lines, shuffle bag,
+               # scheduler, pause)
 swift build    # build everything
 ```
 
@@ -44,8 +45,13 @@ or build a proper .app bundle (menu-bar item, `LSUIElement`, ad-hoc signed):
 open build/Anear.app
 ```
 
-Either way you get a menu-bar item titled **Anear** with **Preview** and
-**Quit** — no Dock icon. **Preview** shows the next line from a shuffle bag
+Either way you get a menu-bar item titled **Anear** (or **Anear · paused**)
+with **Pause**, **Preview**, and **Quit** — no Dock icon. Every 8–20 minutes
+of *active* time a scheduler deals the next line from a shuffle bag and
+shows the fading pill; it stays silent while you are idle, the screen is
+locked or asleep, the screensaver is running, or secure input is active.
+**Pause** freezes the cadence until you choose **Resume**, and the paused
+state survives relaunch. **Preview** shows the next line from a shuffle bag
 over your lines (the eight-line first-person starter pack until you edit
 them), as a fading pill pinned near the cursor: it holds for ~4s, fades out
 over ~1.25s, never takes focus, and lets clicks pass through to whatever is
@@ -58,7 +64,8 @@ under it.
 - [x] Overlay panel + fade (Preview menu item)
 - [x] Line store (UserDefaults) + shuffle bag (starter pack lines, no
       immediate repeat), unit tested
-- [ ] Presence-gated scheduler + Pause
+- [x] Presence-gated sparse scheduler (idle/lock/screensaver/sleep/secure
+      input aware) + sticky Pause, unit tested with a fake clock
 - [ ] Edit Lines window + login item
 
 ## License

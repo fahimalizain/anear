@@ -93,20 +93,35 @@ is fine; the PR squash is what lands on master.
 
 - **Config vs runtime state.** Lines, interval bounds, and `followCursor`
   live in `~/Library/Application Support/Anear/config.json` via `ConfigStore`.
-  Pause and Start-at-Login stay in UserDefaults.
+  Pause and Start-at-Login stay in UserDefaults. The pause is persisted as an
+  explicit state: running, indefinite, or an absolute wall-clock deadline.
+  A relaunch mid-pause comes back paused, same deadline, same option ticked,
+  and a deadline that passed while the app was closed reads as running. The
+  legacy `anear.paused` bool must keep working: a stored `true` is an
+  indefinite pause, and anything unreadable or half-written reads as
+  **running**, never a stuck pause.
 - **New JSON keys.** Existing files on disk must keep decoding. Add
   `decodeIfPresent` (or equivalent) with a safe default. A failed decode
   drops the user onto the starter pack — that is a regression. Add a
   handwritten-JSON test without the new key (see `ConfigStoreTests`).
 - **Scheduler semantics.** Idle (`isPresent == false`) *freezes* the leftover
   wait — no backlog after a long absence. Pause *discards* it; resume rolls a
-  fresh interval. Do not collapse these.
+  fresh interval. A timed pause **expiring** is a resume too: the tick runs
+  the same `apply` as Resume Now, so expiry rolls a fresh interval and a line
+  never fires at the moment a pause lapses. Do not collapse these.
 - **Overlay must not activate the app.** The pill is a non-activating,
   click-through panel. The Config window is the only place `NSApp.activate`
   runs.
 - **Status item is a glyph.** Never put a title on the status button. Paused
   state is `appearsDisabled` + tooltip `Anear · paused`. The leftover wait is
-  a *disabled menu item* (`Next in 5m 15s` / `Paused`), not the button title.
+  a *disabled menu item* — `Next in 5m 15s` while running, `Paused` while
+  paused indefinitely, `Paused · 42m left` while timed — never the button
+  title. Pause is a *submenu* whose parent reads `Pause` / `Paused`; it never
+  toggles to `Resume`. The ticked duration and the `Resume Now` entry (shown
+  only while a pause is in effect) carry that state instead.
+- **Preview ignores the pause.** The Preview item and the Config window's
+  preview always deal and show a line on demand, paused or not. That is
+  deliberate — Preview is for checking your lines, not for the cadence.
 - **AnearCore stays testable.** Placement (`OverlayGeometry`), timing,
   scheduler, config, shuffle bag, countdown format — pure functions/types
   with tests. AppKit types stay in `Sources/Anear` and are generally untested.
@@ -122,6 +137,8 @@ is fine; the PR squash is what lands on master.
 - Overlay show/hold/fade + cursor tracking: `Sources/Anear/OverlayController.swift`
 - Placement math: `Sources/AnearCore/OverlayGeometry.swift`
 - Scheduler: `Sources/AnearCore/SparseScheduler.swift`
+- Pause state + persistence: `Sources/AnearCore/PauseState.swift`,
+  `Sources/AnearCore/PauseStore.swift`
 - Presence gate: `Sources/Anear/PresenceMonitor.swift`
 - Config model + window: `Sources/Anear/ConfigWindow.swift`, `Sources/AnearCore/AnearConfig.swift`, `Sources/AnearCore/ConfigStore.swift`
 - Menu, timer, wiring: `Sources/Anear/main.swift`

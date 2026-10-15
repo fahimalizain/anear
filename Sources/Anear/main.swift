@@ -41,12 +41,21 @@ final class MenuActions: NSObject {
     private var lines: [Line]
     private var bag = ShuffleBag()
     private var scheduler: SparseScheduler
+    /// The pause in effect, restored from UserDefaults at launch. This is the
+    /// source of truth: the scheduler only mirrors it, so `apply` is the one
+    /// path that changes either. Choosing a duration in the Pause submenu,
+    /// Resume Now, and the tick's expiry all land here.
+    private var pauseState: PauseState
     private let presence = PresenceMonitor()
     private var timer: Timer?
     /// Wired after the status item and menu are created below.
     weak var statusItem: NSStatusItem?
     weak var countdownItem: NSMenuItem?
     weak var pauseItem: NSMenuItem?
+    /// The Pause submenu, held instead of an array of its items: `updateTitles`
+    /// repaints by walking it, so the items stay owned by the menu that will
+    /// show them and no parallel list can drift out of sync.
+    weak var pauseSubmenu: NSMenu?
     weak var loginItem: NSMenuItem?
     /// Created on first use, owned for the process lifetime. The window's
     /// closures hold us weakly, so there is no cycle.
@@ -73,9 +82,12 @@ final class MenuActions: NSObject {
             now: { ProcessInfo.processInfo.systemUptime },
             nextInterval: { Double.random(in: range.min...range.max) }
         )
+        pauseState = pauseStore.load(at: Date())
         super.init()
-        // Sticky pause: restore the persisted state before the first tick.
-        if pauseStore.load() {
+        // Sticky pause: restore the persisted pause state before the first
+        // tick, so a relaunch during a pause starts paused. `load` reads an
+        // expired timed pause back as running.
+        if pauseState.isPaused {
             scheduler.setPaused(true)
         }
         registerLoginItemOnFirstLaunch()
@@ -99,6 +111,16 @@ final class MenuActions: NSObject {
     }
 
     private func schedulerTick() {
+        // Expiry is evaluated at the top of the tick, so a pause whose deadline
+        // has just passed is already running by the time the scheduler drains
+        // its countdown. Ending a pause this way goes through the same `apply`
+        // as Resume Now, which means `setPaused(false)` rolls a fresh 8–20
+        // minute interval: an expiry is never immediately followed by a line.
+        let now = Date()
+        let refreshed = pauseState.refreshed(at: now)
+        if refreshed != pauseState {
+            apply(refreshed)
+        }
         let fired = scheduler.tick(isPresent: presence.isPresent)
         updateTitles()
         guard fired, let text = bag.next(from: lines.map(\.text)) else { return }
@@ -109,30 +131,84 @@ final class MenuActions: NSObject {
         )
     }
 
-    @objc func togglePause(_ sender: Any?) {
-        let paused = !scheduler.isPaused
-        scheduler.setPaused(paused)
-        pauseStore.save(paused)
+    /// Starts the chosen pause from now. Choosing a duration while already
+    /// paused *replaces* the pause — a new deadline counted from this instant —
+    /// rather than toggling it away, and choosing the option that is already
+    /// ticked re-arms it for another full duration. The tag is the item's index
+    /// in `PauseDuration.allCases`, which the model declares in menu order;
+    /// anything outside that range (a separator's default tag, say) is ignored.
+    @objc func pauseForDuration(_ sender: NSMenuItem) {
+        guard PauseDuration.allCases.indices.contains(sender.tag) else { return }
+        let duration = PauseDuration.allCases[sender.tag]
+        apply(PauseState.started(duration, at: Date(), calendar: .current))
+    }
+
+    /// Ends a pause early, from the submenu's last entry. Runs through the same
+    /// `apply` as expiry, so resume rolls a fresh interval either way.
+    @objc func resumeNow(_ sender: Any?) {
+        apply(.running)
+    }
+
+    /// The one place a pause change lands, in a deliberate order: the model
+    /// first, then the scheduler mirror, then the store, then the chrome.
+    /// Resume must pass through here so the scheduler rolls its fresh interval
+    /// *before* anything repaints — the countdown item reads the scheduler, so
+    /// it would otherwise show the wait that resume throws away.
+    private func apply(_ state: PauseState) {
+        pauseState = state
+        scheduler.setPaused(state.isPaused)
+        pauseStore.save(state)
         updateTitles()
     }
 
-    /// Reflects scheduler state in the status tooltip, the dimmed state of
-    /// the status button, the Pause item title, and the top countdown item.
-    /// Called on toggle, once at launch (sticky pause), every tick, and
-    /// whenever the menu opens. The button shows the template glyph, never
+    /// Reflects the pause model in the status tooltip, the dimmed state of the
+    /// status button, the Pause item title, the ticked duration and the hidden
+    /// Resume Now entry in the Pause submenu, and the top countdown item.
+    /// Called on every pause change, once at launch (sticky pause), every tick,
+    /// and whenever the menu opens. The button shows the template glyph, never
     /// a title, so the paused state is carried by `appearsDisabled` and the
-    /// tooltip instead. While paused the countdown item reads "Paused"
-    /// rather than the leftover seconds: those are the discarded wait that
-    /// resume throws away when it rolls a fresh interval.
+    /// tooltip instead. While paused the countdown item names the pause and how
+    /// much of it is left, rather than the leftover seconds: those are the
+    /// discarded wait that resume throws away when it rolls a fresh interval.
+    /// This only reads `pauseState` — expiry belongs to the tick, so opening
+    /// the menu can never end a pause.
     func updateTitles() {
-        let paused = scheduler.isPaused
+        let paused = pauseState.isPaused
         statusItem?.button?.toolTip = paused ? "Anear · paused" : "Anear"
         statusItem?.button?.appearsDisabled = paused
-        pauseItem?.title = paused ? "Resume" : "Pause"
-        countdownItem?.title =
-            paused
-            ? "Paused"
-            : "Next in \(CountdownFormat.display(seconds: scheduler.remainingSeconds))"
+        pauseItem?.title = paused ? "Paused" : "Pause"
+        switch pauseState {
+        case .running:
+            countdownItem?.title =
+                "Next in \(CountdownFormat.display(seconds: scheduler.remainingSeconds))"
+        case .indefinite:
+            countdownItem?.title = "Paused"
+        case .until:
+            let remaining = pauseState.remaining(at: Date()) ?? 0
+            countdownItem?.title = "Paused · \(CountdownFormat.display(seconds: remaining)) left"
+        }
+        // Exactly one duration is ticked. Tags are indices into
+        // `PauseDuration.allCases`, but nothing else in the submenu may be
+        // mistaken for a duration: a separator keeps the default tag 0 (which
+        // collides with `.fifteenMinutes`) and is skipped by kind, Resume Now
+        // is built with an out-of-range tag, and the bounds check catches
+        // anything else unexpected — so no non-duration item can be painted.
+        let ticked = pauseState.tickedDuration
+        for item in pauseSubmenu?.items ?? [] {
+            guard !item.isSeparatorItem,
+                PauseDuration.allCases.indices.contains(item.tag)
+            else { continue }
+            item.state = PauseDuration.allCases[item.tag] == ticked ? .on : .off
+        }
+        // Resume Now and the divider above it are the submenu's last two
+        // entries, and they are toggled together: AppKit hides a separator
+        // sitting between other separators, not one whose neighbour was hidden
+        // here, so the divider's `isHidden` is set explicitly alongside.
+        if let tail = pauseSubmenu?.items.suffix(2) {
+            for item in tail {
+                item.isHidden = !paused
+            }
+        }
     }
 
     @objc func preview(_ sender: Any?) {
@@ -249,14 +325,43 @@ countdownItem.isEnabled = false
 menu.addItem(countdownItem)
 menuActions.countdownItem = countdownItem
 menu.addItem(.separator())
-let pauseItem = NSMenuItem(
-    title: "Pause",
-    action: #selector(MenuActions.togglePause(_:)),
+// Pause is a submenu of the five durations, each of which starts that pause
+// from now, plus Resume Now while a pause is in effect. The parent carries no
+// action: an item with a submenu opens it on click, and an action alongside a
+// submenu would be unreachable.
+let pauseItem = NSMenuItem(title: "Pause", action: nil, keyEquivalent: "")
+let pauseSubmenu = NSMenu()
+// One item per duration, in `PauseDuration.allCases` order — the model
+// declares that as menu order. The tag is that index; `pauseForDuration` maps
+// it back, and `updateTitles` walks the same submenu to paint checkmarks.
+for (index, duration) in PauseDuration.allCases.enumerated() {
+    let item = NSMenuItem(
+        title: duration.title,
+        action: #selector(MenuActions.pauseForDuration(_:)),
+        keyEquivalent: ""
+    )
+    item.target = menuActions
+    item.tag = index
+    pauseSubmenu.addItem(item)
+}
+// Resume Now and its divider are built once and only ever shown or hidden, by
+// `updateTitles` while a pause is in effect — nothing re-creates them. Its tag
+// is set to a value outside the duration indices on purpose: an item's default
+// tag is 0, which is `.fifteenMinutes`, and the checkmark pass paints by tag —
+// so a non-duration item in this submenu must be pushed out of that range.
+pauseSubmenu.addItem(.separator())
+let resumeNowItem = NSMenuItem(
+    title: "Resume Now",
+    action: #selector(MenuActions.resumeNow(_:)),
     keyEquivalent: ""
 )
-pauseItem.target = menuActions
+resumeNowItem.target = menuActions
+resumeNowItem.tag = -1
+pauseSubmenu.addItem(resumeNowItem)
+pauseItem.submenu = pauseSubmenu
 menu.addItem(pauseItem)
 menuActions.pauseItem = pauseItem
+menuActions.pauseSubmenu = pauseSubmenu
 let previewItem = NSMenuItem(
     title: "Preview",
     action: #selector(MenuActions.preview(_:)),

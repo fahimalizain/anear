@@ -41,6 +41,10 @@ final class MenuActions: NSObject {
     private var lines: [Line]
     private var bag = ShuffleBag()
     private var scheduler: SparseScheduler
+    /// The pause in effect, restored from UserDefaults at launch. `togglePause`
+    /// flips it between `.running` and `.indefinite`; the menu item is still a
+    /// plain Pause/Resume toggle.
+    private var pauseState: PauseState
     private let presence = PresenceMonitor()
     private var timer: Timer?
     /// Wired after the status item and menu are created below.
@@ -73,9 +77,12 @@ final class MenuActions: NSObject {
             now: { ProcessInfo.processInfo.systemUptime },
             nextInterval: { Double.random(in: range.min...range.max) }
         )
+        pauseState = pauseStore.load(at: Date())
         super.init()
-        // Sticky pause: restore the persisted state before the first tick.
-        if pauseStore.load() {
+        // Sticky pause: restore the persisted pause state before the first
+        // tick, so a relaunch during a pause starts paused. `load` reads an
+        // expired timed pause back as running.
+        if pauseState.isPaused {
             scheduler.setPaused(true)
         }
         registerLoginItemOnFirstLaunch()
@@ -110,9 +117,12 @@ final class MenuActions: NSObject {
     }
 
     @objc func togglePause(_ sender: Any?) {
-        let paused = !scheduler.isPaused
-        scheduler.setPaused(paused)
-        pauseStore.save(paused)
+        // Still a plain toggle: paused resumes, running pauses indefinitely.
+        // The timed durations arrive with the pause submenu.
+        let next: PauseState = pauseState.isPaused ? .running : .indefinite
+        scheduler.setPaused(next.isPaused)
+        pauseState = next
+        pauseStore.save(next)
         updateTitles()
     }
 

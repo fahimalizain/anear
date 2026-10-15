@@ -57,8 +57,14 @@ Login**, and **Quit** — no Dock icon. Hover the icon for the **Anear**
 of *active* time a scheduler deals the next line from a shuffle bag and
 shows the fading pill; it stays silent while you are idle, the screen is
 locked or asleep, the screensaver is running, or secure input is active.
-**Pause** freezes the cadence until you choose **Resume**, and the paused
-state survives relaunch. **Preview** shows the next line from a shuffle bag
+**Pause** is a submenu of five durations — **15 Minutes**, **1 Hour**,
+**3 Hours**, **Today** (until midnight), and **Indefinitely**. Picking
+one stops the cadence from that moment, ticks that option, and relabels
+the parent **Paused** (never **Resume**); picking another replaces the
+pause. **Resume Now** ends it early, and a timed pause also expires on
+its own — rolling a fresh 8–20 minute wait, not a line. **Indefinitely**
+never expires by itself. The pause survives relaunch, deadline included.
+**Preview** shows the next line from a shuffle bag
 over your lines (the eight-line first-person starter pack until you edit
 them), as a fading pill pinned near the cursor: it holds for ~4s, fades out
 over ~1.25s, never takes focus, and lets clicks pass through to whatever is
@@ -73,9 +79,10 @@ is explicit — closing the window via the red traffic light never saves).
 Lines and the interval live in a real JSON file at
 `~/Library/Application Support/Anear/config.json` (pretty-printed, created
 on first Save; the window shows its path and can reveal it in Finder).
-The pause / start-at-login flags intentionally stay in UserDefaults —
-they are runtime state, not config. The interval takes effect immediately
-on Save; a fresh countdown rolls from the new range.
+The pause state — a timed pause's deadline included — and the
+start-at-login flag intentionally stay in UserDefaults: they are runtime
+state, not config. The interval takes effect immediately on Save, and a
+fresh countdown rolls from the new range.
 
 **Start at Login** is a checkbox backed by `SMAppService.mainApp`: it is
 turned **on by default** after first launch (the one-time registration is
@@ -95,7 +102,8 @@ consumes the one-shot flag.
 - [x] Config store (JSON file) + shuffle bag (starter pack lines, no
       immediate repeat), unit tested
 - [x] Presence-gated sparse scheduler (idle/lock/screensaver/sleep/secure
-      input aware) + sticky Pause, unit tested with a fake clock
+      input aware) + sticky Pause submenu (five durations, auto-expiry),
+      unit tested with a fake clock
 - [x] Config window (lines + interval bounds, JSON file path, Save closes
       the window) + Start at Login (SMAppService, on by default after first
       launch)

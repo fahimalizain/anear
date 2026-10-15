@@ -109,4 +109,22 @@ struct PauseStateTests {
             }
         }
     }
+
+    @Test func tickedDurationNamesTheOptionThatStartedThePause() {
+        let deadline = now.addingTimeInterval(3 * 3600)
+
+        #expect(PauseState.running.tickedDuration == nil)
+        #expect(PauseState.indefinite.tickedDuration == .indefinitely)
+        #expect(
+            PauseState.until(.fifteenMinutes, deadline: deadline).tickedDuration
+                == .fifteenMinutes
+        )
+        #expect(PauseState.until(.oneHour, deadline: deadline).tickedDuration == .oneHour)
+        #expect(PauseState.until(.threeHours, deadline: deadline).tickedDuration == .threeHours)
+        // The duration is the one carried in the state, not one recomputed
+        // from the deadline: this deadline is three hours out, which no
+        // calendar would read as `Today`, and the menu must still tick the
+        // option the user actually chose.
+        #expect(PauseState.until(.today, deadline: deadline).tickedDuration == .today)
+    }
 }

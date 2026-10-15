@@ -85,6 +85,17 @@ public enum PauseState: Equatable, Sendable {
         }
     }
 
+    /// The menu option to tick for this state, or `nil` while running. An
+    /// indefinite pause ticks `Indefinitely`; a timed pause ticks the duration
+    /// that started it.
+    public var tickedDuration: PauseDuration? {
+        switch self {
+        case .running: return nil
+        case .until(let duration, _): return duration
+        case .indefinite: return .indefinitely
+        }
+    }
+
     /// Seconds until the pause ends; `nil` while running or indefinite, since
     /// neither has an end to count down to. Negative once `now` is past the
     /// deadline — the caller normally refreshes first, but a countdown must

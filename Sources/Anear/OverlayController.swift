@@ -11,8 +11,8 @@ import QuartzCore
 final class OverlayController {
     private let panel: OverlayPanel
     private var fadeWork: DispatchWorkItem?
-    /// Bumped on every `show` so stale fade/hide work can never touch a
-    /// freshly shown pill.
+    /// Bumped on every `show` and `dismiss` so stale fade/hide work can never
+    /// touch the current pill.
     private var generation = UUID()
     /// Cursor-tracking event monitors, installed only while `followCursor`
     /// is on. Both a local and a global monitor: the local one sees moves
@@ -65,7 +65,8 @@ final class OverlayController {
             startTracking()
         }
 
-        // Hold, then fade, then hide. Preview again cancels this work item.
+        // Hold, then fade, then hide. Preview again (or a pause) cancels this
+        // work item.
         let token = generation
         let work = DispatchWorkItem { [weak self] in
             self?.fadeOut(token: token)
@@ -75,6 +76,20 @@ final class OverlayController {
             deadline: .now() + holdDuration,
             execute: work
         )
+    }
+
+    /// Ends a visible pill early: the pending hold is cancelled and the normal
+    /// fade starts now, instead of at the end of the hold. A no-op when
+    /// nothing is on screen. This is the pause action's hook — Preview still
+    /// works while paused, this only closes what is already visible.
+    func dismiss() {
+        guard panel.isVisible else { return }
+        // Same invalidation as `show`: cancel the queued fade and take a new
+        // generation, so a stale completion cannot touch this dismissal.
+        fadeWork?.cancel()
+        fadeWork = nil
+        generation = UUID()
+        fadeOut(token: generation)
     }
 
     /// Places the panel next to the current cursor position, using the

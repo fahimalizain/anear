@@ -122,6 +122,10 @@ is fine; the PR squash is what lands on master.
 - **Preview ignores the pause.** The Preview item and the Config window's
   preview always deal and show a line on demand, paused or not. That is
   deliberate — Preview is for checking your lines, not for the cadence.
+- **Pausing dismisses a visible pill.** Choosing a duration cancels the
+  remaining hold and starts the normal fade immediately, so a line already on
+  screen does not outlive the pause. Resume and expiry do not touch the
+  overlay.
 - **AnearCore stays testable.** Placement (`OverlayGeometry`), timing,
   scheduler, config, shuffle bag, countdown format — pure functions/types
   with tests. AppKit types stay in `Sources/Anear` and are generally untested.

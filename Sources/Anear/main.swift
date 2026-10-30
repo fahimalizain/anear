@@ -154,10 +154,18 @@ final class MenuActions: NSObject {
     /// Resume must pass through here so the scheduler rolls its fresh interval
     /// *before* anything repaints — the countdown item reads the scheduler, so
     /// it would otherwise show the wait that resume throws away.
+    ///
+    /// A pause also closes an already-visible pill: its hold is cut short and
+    /// the normal fade starts now, so a line on screen does not outlive the
+    /// pause. Resume and expiry arrive here with `.running` and leave the
+    /// overlay alone.
     private func apply(_ state: PauseState) {
         pauseState = state
         scheduler.setPaused(state.isPaused)
         pauseStore.save(state)
+        if state.isPaused {
+            overlay.dismiss()
+        }
         updateTitles()
     }
 

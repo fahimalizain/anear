@@ -77,6 +77,20 @@ final class OverlayController {
         )
     }
 
+    /// Ends a visible pill early: the pending hold is cancelled and the normal
+    /// fade starts now, instead of at the end of the hold. A no-op when
+    /// nothing is on screen. This is the pause action's hook — Preview still
+    /// works while paused, this only closes what is already visible.
+    func dismiss() {
+        guard panel.isVisible else { return }
+        // Same invalidation as `show`: cancel the queued fade and take a new
+        // generation, so a stale completion cannot touch this dismissal.
+        fadeWork?.cancel()
+        fadeWork = nil
+        generation = UUID()
+        fadeOut(token: generation)
+    }
+
     /// Places the panel next to the current cursor position, using the
     /// screen under it and that screen's visible frame (menu bar / Dock
     /// excluded), never its full frame. Called at spawn and, while

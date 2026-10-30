@@ -61,7 +61,9 @@ locked or asleep, the screensaver is running, or secure input is active.
 **3 Hours**, **Today** (until midnight), and **Indefinitely**. Picking
 one stops the cadence from that moment, ticks that option, and relabels
 the parent **Paused** (never **Resume**); picking another replaces the
-pause. **Resume Now** ends it early, and a timed pause also expires on
+pause. Picking a duration also closes a line that is already on screen:
+its hold is cut short and the fade starts immediately. **Resume Now**
+ends it early, and a timed pause also expires on
 its own — rolling a fresh 8–20 minute wait, not a line. **Indefinitely**
 never expires by itself. The pause survives relaunch, deadline included.
 **Preview** shows the next line from a shuffle bag

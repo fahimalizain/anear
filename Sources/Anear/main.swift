@@ -308,9 +308,11 @@ final class MenuActions: NSObject, NSMenuItemValidation {
     }
 
     @objc func preview(_ sender: Any?) {
-        // The validated-off menu item is only the hint; this guard is the real
-        // check, and the Config window's Preview button is guarded the same
-        // way in its own closure.
+        // The click samples capture itself rather than trusting the sample
+        // `menuNeedsUpdate` took when the menu opened: a share can start in
+        // between, with its attach event not delivered yet. A rising edge hides
+        // the pill here, then the guard refuses. Capture only — never the pause.
+        refreshCapture()
         guard !captureHold.isCaptured else { return }
         if let text = bag.next(from: lines.map(\.text)) {
             overlay.show(

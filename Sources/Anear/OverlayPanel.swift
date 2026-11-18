@@ -42,6 +42,16 @@ final class OverlayPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         animationBehavior = .utilityWindow
         contentView = hostingView
+        excludeFromCapture()
+    }
+
+    /// Best effort, never the gate. Apple documents `.none` as a legacy value
+    /// and ScreenCaptureKit often ignores it, so this only helps captures that
+    /// still honour the flag; `CaptureHold` is what actually keeps a line off a
+    /// shared screen. Re-applied on every show because AppKit can clear it when
+    /// a panel is ordered front.
+    func excludeFromCapture() {
+        sharingType = .none
     }
 
     override var canBecomeKey: Bool { false }

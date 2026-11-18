@@ -58,6 +58,10 @@ final class OverlayController {
         panel.setContentSize(size)
 
         pinToCursor()
+        // Ordering a panel front can clear the capture exclusion, so it is
+        // re-applied here rather than only in the panel's init. Best effort:
+        // `CaptureHold` is what stops the line.
+        panel.excludeFromCapture()
         panel.orderFrontRegardless()
 
         // Follow the pointer for the pill's whole visible life if asked.

@@ -7,7 +7,8 @@ import ServiceManagement
 // Login, and Quit. A presence-gated sparse scheduler deals the next
 // shuffle-bag line every 8–20 minutes of *active* time (both bounds come
 // from the JSON config file) and shows the fading pill; it stays silent on
-// idle, lock, screensaver, sleep, and secure input.
+// idle, lock, screensaver, sleep, and secure input. It also stays silent while
+// the screen is being captured, unless Hide While Sharing is off.
 // Pause is sticky across launches; Start at Login registers the app bundle
 // via SMAppService (on by default after first launch). Lines and interval
 // live in `~/Library/Application Support/Anear/config.json` (see
@@ -32,7 +33,7 @@ private final class IntervalRange: @unchecked Sendable {
 
 /// Target for status menu actions. Lives for the process lifetime as a
 /// top-level `let`, so `#selector` always has a valid target.
-final class MenuActions: NSObject {
+final class MenuActions: NSObject, NSMenuItemValidation {
     let overlay = OverlayController()
     private let configStore = ConfigStore(fileURL: ConfigStore.defaultFileURL())
     private let intervalRange = IntervalRange(min: 8 * 60, max: 20 * 60)
@@ -47,6 +48,12 @@ final class MenuActions: NSObject {
     /// Resume Now, and the tick's expiry all land here.
     private var pauseState: PauseState
     private let presence = PresenceMonitor()
+    /// Capture is a *hold*, not a pause: it freezes the scheduler and leaves
+    /// the glyph undimmed, and it never reaches `PauseStore`. Fed by the
+    /// monitor's notifications and sampled once per tick.
+    private var captureHold = CaptureHold()
+    private let captureMonitor = ScreenCaptureMonitor()
+    private let captureStore = CaptureSuppressionStore(defaults: .standard)
     private var timer: Timer?
     /// Wired after the status item and menu are created below.
     weak var statusItem: NSStatusItem?
@@ -57,13 +64,26 @@ final class MenuActions: NSObject {
     /// show them and no parallel list can drift out of sync.
     weak var pauseSubmenu: NSMenu?
     weak var loginItem: NSMenuItem?
+    /// The Hide While Sharing checkbox, painted from `captureStore`.
+    weak var suppressItem: NSMenuItem?
+    /// Validated off while capture is latched — a click would deal a line onto
+    /// the shared screen; `validateMenuItem` is what makes that stick. A pause
+    /// does not disable it.
+    weak var previewItem: NSMenuItem?
     /// Created on first use, owned for the process lifetime. The window's
     /// closures hold us weakly, so there is no cycle.
     private lazy var configWindow = ConfigWindow(
         fileURL: configStore.fileURL,
         onSave: { [weak self] config in self?.saveConfig(config) },
         onPreview: { [weak self] text, followCursor, holdDuration in
-            self?.overlay.show(
+            // This path has no `menuNeedsUpdate` sample of its own, so it
+            // samples first: with the attach event missing, the latch can be
+            // almost a second old and a line must not land on the share. A
+            // rising edge hides the pill; then the guard refuses the preview.
+            guard let self else { return }
+            self.refreshCapture()
+            guard !self.captureHold.isCaptured else { return }
+            self.overlay.show(
                 text: text,
                 followCursor: followCursor,
                 holdDuration: holdDuration
@@ -90,6 +110,15 @@ final class MenuActions: NSObject {
         if pauseState.isPaused {
             scheduler.setPaused(true)
         }
+        // Sample capture before the first tick, so a relaunch mid-call does not
+        // paint a running countdown over a frozen one. A rising edge here
+        // dismisses nothing — no pill exists yet — but it latches the hold.
+        captureMonitor.onChange = { [weak self] in
+            self?.refreshCapture()
+            self?.updateTitles()
+        }
+        captureMonitor.start()
+        refreshCapture()
         registerLoginItemOnFirstLaunch()
         startTimer()
     }
@@ -121,7 +150,17 @@ final class MenuActions: NSObject {
         if refreshed != pauseState {
             apply(refreshed)
         }
-        let fired = scheduler.tick(isPresent: presence.isPresent)
+        // Capture freezes the scheduler the way idling does — the leftover
+        // wait is kept, not discarded — but an explicit pause still wins, and
+        // it was just refreshed above. This never pauses the scheduler itself
+        // and never writes `PauseStore`: a capture is not a choice the user
+        // made.
+        refreshCapture()
+        let present = CapturePolicy.schedulerIsPresent(
+            humanPresent: presence.isPresent,
+            captureLatched: captureHold.isCaptured
+        )
+        let fired = scheduler.tick(isPresent: present)
         updateTitles()
         guard fired, let text = bag.next(from: lines.map(\.text)) else { return }
         overlay.show(
@@ -180,20 +219,36 @@ final class MenuActions: NSObject {
     /// discarded wait that resume throws away when it rolls a fresh interval.
     /// This only reads `pauseState` — expiry belongs to the tick, so opening
     /// the menu can never end a pause.
+    ///
+    /// Capture is named in the tooltip and the countdown item, and never dims
+    /// the button: that dim is the pause signal, and a capture is not a pause.
     func updateTitles() {
         let paused = pauseState.isPaused
-        statusItem?.button?.toolTip = paused ? "Anear · paused" : "Anear"
         statusItem?.button?.appearsDisabled = paused
+        if paused {
+            statusItem?.button?.toolTip = "Anear · paused"
+        } else if captureHold.isCaptured {
+            statusItem?.button?.toolTip = "Anear · sharing"
+        } else {
+            statusItem?.button?.toolTip = "Anear"
+        }
         pauseItem?.title = paused ? "Paused" : "Pause"
-        switch pauseState {
-        case .running:
-            countdownItem?.title =
-                "Next in \(CountdownFormat.display(seconds: scheduler.remainingSeconds))"
-        case .indefinite:
+        // Pause outranks capture, capture outranks the frozen countdown: the
+        // leftover seconds must not be shown moving while nothing is moving.
+        switch CapturePolicy.menuStatus(
+            pause: pauseState,
+            captureLatched: captureHold.isCaptured,
+            schedulerRemaining: scheduler.remainingSeconds,
+            now: Date()
+        ) {
+        case .pausedIndefinite:
             countdownItem?.title = "Paused"
-        case .until:
-            let remaining = pauseState.remaining(at: Date()) ?? 0
+        case .pausedUntil(let remaining):
             countdownItem?.title = "Paused · \(CountdownFormat.display(seconds: remaining)) left"
+        case .captured:
+            countdownItem?.title = "Screen captured"
+        case .running(let remaining):
+            countdownItem?.title = "Next in \(CountdownFormat.display(seconds: remaining))"
         }
         // Exactly one duration is ticked. Tags are indices into
         // `PauseDuration.allCases`, but nothing else in the submenu may be
@@ -217,9 +272,48 @@ final class MenuActions: NSObject {
                 item.isHidden = !paused
             }
         }
+        suppressItem?.state = captureStore.isEnabled() ? .on : .off
+        // Preview survives a pause — it is for checking lines, not the cadence
+        // — but not a capture: that click would put a line on the shared screen.
+        // Capture wins here only when both are true; the countdown row above
+        // still names the pause. `validateMenuItem` is what keeps the grey on
+        // at the next open; this line carries a menu that is already open.
+        previewItem?.isEnabled = !captureHold.isCaptured
+    }
+
+    /// Feeds one capture sample into the hold. Only the rising edge acts: it
+    /// closes a pill that is already up, because that line is now on a screen
+    /// somebody else can see. `hideNow`, not `dismiss`: the fade would still
+    /// be visible to whoever is capturing.
+    private func refreshCapture() {
+        let rising = captureHold.observe(
+            rawCaptured: captureMonitor.rawIsCaptured(),
+            enabled: captureStore.isEnabled(),
+            at: Date()
+        )
+        if rising {
+            overlay.hideNow()
+        }
+    }
+
+    /// Flips Hide While Sharing. Turning it off drops the latch on the spot —
+    /// `observe` with `enabled: false` is not a rising edge, so nothing is
+    /// hidden — and the next tick continues the frozen remainder. Turning it
+    /// on samples immediately, so a share already in progress is hidden on that
+    /// edge instead of waiting for the next tick.
+    @objc func toggleSuppressWhileCaptured(_ sender: Any?) {
+        captureStore.setEnabled(!captureStore.isEnabled())
+        refreshCapture()
+        updateTitles()
     }
 
     @objc func preview(_ sender: Any?) {
+        // The click samples capture itself rather than trusting the sample
+        // `menuNeedsUpdate` took when the menu opened: a share can start in
+        // between, with its attach event not delivered yet. A rising edge hides
+        // the pill here, then the guard refuses. Capture only — never the pause.
+        refreshCapture()
+        guard !captureHold.isCaptured else { return }
         if let text = bag.next(from: lines.map(\.text)) {
             overlay.show(
                 text: text,
@@ -227,6 +321,20 @@ final class MenuActions: NSObject {
                 holdDuration: config.holdDuration
             )
         }
+    }
+
+    /// AppKit's menu validation hook — what makes a greyed-out Preview stick.
+    /// `menu.autoenablesItems` is on, and with no validation an item whose
+    /// target responds to its action is re-enabled every time the menu opens,
+    /// quietly undoing the `isEnabled` assignment in `updateTitles`. The click
+    /// guard in `preview` is still the real check. Every other action here
+    /// (pause durations, Resume Now, Config, Hide While Sharing, Start at
+    /// Login) stays clickable.
+    @objc func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if item.action == #selector(preview(_:)) {
+            return !captureHold.isCaptured
+        }
+        return true
     }
 
     @objc func openConfig(_ sender: Any?) {
@@ -283,7 +391,14 @@ extension MenuActions: NSMenuDelegate {
     /// Refresh the countdown item and the Start at Login checkbox every time
     /// the menu opens; the countdown can tick under a mouse-hover and the
     /// login status can change out from under us (System Settings, etc.).
+    ///
+    /// Capture is sampled first, so the Preview guard reads a latch that is
+    /// current rather than up to a second old: the attach event may never
+    /// arrive, and a click here would be the first sample after a share
+    /// started. Only capture is sampled — the pause is not refreshed, so
+    /// opening the menu still cannot expire one.
     func menuNeedsUpdate(_ menu: NSMenu) {
+        refreshCapture()
         updateTitles()
         updateLoginItem()
     }
@@ -377,6 +492,7 @@ let previewItem = NSMenuItem(
 )
 previewItem.target = menuActions
 menu.addItem(previewItem)
+menuActions.previewItem = previewItem
 let configItem = NSMenuItem(
     title: "Config…",
     action: #selector(MenuActions.openConfig(_:)),
@@ -384,6 +500,17 @@ let configItem = NSMenuItem(
 )
 configItem.target = menuActions
 menu.addItem(configItem)
+// On by default (`CaptureSuppressionStore` reads anything but an explicit
+// false as on), so a first launch already hides on a share. No tag: it is not
+// in the Pause submenu, and the checkmark pass there paints by tag.
+let suppressItem = NSMenuItem(
+    title: "Hide While Sharing",
+    action: #selector(MenuActions.toggleSuppressWhileCaptured(_:)),
+    keyEquivalent: ""
+)
+suppressItem.target = menuActions
+menu.addItem(suppressItem)
+menuActions.suppressItem = suppressItem
 let loginItem = NSMenuItem(
     title: "Start at Login",
     action: #selector(MenuActions.toggleLoginItem(_:)),

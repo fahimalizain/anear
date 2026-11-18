@@ -96,6 +96,25 @@ final class OverlayController {
         fadeOut(token: generation)
     }
 
+    /// Ends a visible pill with no fade at all — one frame, gone. Capture uses
+    /// this instead of `dismiss`: a 1.25 s fade is still on the shared screen,
+    /// which is the whole thing capture suppression is for. A pause can afford
+    /// the fade; a capture cannot.
+    ///
+    /// The new generation invalidates any in-flight fade, but its completion
+    /// would bail on the token mismatch, so the panel is ordered out and the
+    /// tracking stopped here, not there. Safe when nothing is visible.
+    func hideNow() {
+        fadeWork?.cancel()
+        fadeWork = nil
+        generation = UUID()
+        // Assigning alpha directly, not through `animator()`, cuts a fade that
+        // is already running rather than queuing another animation behind it.
+        panel.alphaValue = 0
+        panel.orderOut(nil)
+        stopTracking()
+    }
+
     /// Places the panel next to the current cursor position, using the
     /// screen under it and that screen's visible frame (menu bar / Dock
     /// excluded), never its full frame. Called at spawn and, while

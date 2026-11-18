@@ -277,7 +277,8 @@ final class MenuActions: NSObject {
 
     /// Feeds one capture sample into the hold. Only the rising edge acts: it
     /// closes a pill that is already up, because that line is now on a screen
-    /// someone else can see.
+    /// somebody else can see. `hideNow`, not `dismiss`: the fade would still
+    /// be visible to whoever is capturing.
     private func refreshCapture() {
         let rising = captureHold.observe(
             rawCaptured: captureMonitor.rawIsCaptured(),
@@ -285,7 +286,7 @@ final class MenuActions: NSObject {
             at: Date()
         )
         if rising {
-            overlay.dismiss()
+            overlay.hideNow()
         }
     }
 
@@ -368,7 +369,14 @@ extension MenuActions: NSMenuDelegate {
     /// Refresh the countdown item and the Start at Login checkbox every time
     /// the menu opens; the countdown can tick under a mouse-hover and the
     /// login status can change out from under us (System Settings, etc.).
+    ///
+    /// Capture is sampled first, so the Preview guard reads a latch that is
+    /// current rather than up to a second old: the attach event may never
+    /// arrive, and a click here would be the first sample after a share
+    /// started. Only capture is sampled — the pause is not refreshed, so
+    /// opening the menu still cannot expire one.
     func menuNeedsUpdate(_ menu: NSMenu) {
+        refreshCapture()
         updateTitles()
         updateLoginItem()
     }

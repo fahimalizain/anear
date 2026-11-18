@@ -33,7 +33,7 @@ private final class IntervalRange: @unchecked Sendable {
 
 /// Target for status menu actions. Lives for the process lifetime as a
 /// top-level `let`, so `#selector` always has a valid target.
-final class MenuActions: NSObject {
+final class MenuActions: NSObject, NSMenuItemValidation {
     let overlay = OverlayController()
     private let configStore = ConfigStore(fileURL: ConfigStore.defaultFileURL())
     private let intervalRange = IntervalRange(min: 8 * 60, max: 20 * 60)
@@ -66,8 +66,9 @@ final class MenuActions: NSObject {
     weak var loginItem: NSMenuItem?
     /// The Hide While Sharing checkbox, painted from `captureStore`.
     weak var suppressItem: NSMenuItem?
-    /// Disabled while capture is latched: a click would deal a line onto the
-    /// shared screen. A pause does not disable it.
+    /// Validated off while capture is latched — a click would deal a line onto
+    /// the shared screen; `validateMenuItem` is what makes that stick. A pause
+    /// does not disable it.
     weak var previewItem: NSMenuItem?
     /// Created on first use, owned for the process lifetime. The window's
     /// closures hold us weakly, so there is no cycle.
@@ -75,9 +76,13 @@ final class MenuActions: NSObject {
         fileURL: configStore.fileURL,
         onSave: { [weak self] config in self?.saveConfig(config) },
         onPreview: { [weak self] text, followCursor, holdDuration in
-            // The menu item is disabled while captured; this guard is the real
-            // check, and it covers the Config window's Preview button too.
-            guard let self, !self.captureHold.isCaptured else { return }
+            // This path has no `menuNeedsUpdate` sample of its own, so it
+            // samples first: with the attach event missing, the latch can be
+            // almost a second old and a line must not land on the share. A
+            // rising edge hides the pill; then the guard refuses the preview.
+            guard let self else { return }
+            self.refreshCapture()
+            guard !self.captureHold.isCaptured else { return }
             self.overlay.show(
                 text: text,
                 followCursor: followCursor,
@@ -270,8 +275,9 @@ final class MenuActions: NSObject {
         suppressItem?.state = captureStore.isEnabled() ? .on : .off
         // Preview survives a pause — it is for checking lines, not the cadence
         // — but not a capture: that click would put a line on the shared screen.
-        // When both are true capture wins here only; the countdown row above
-        // still names the pause.
+        // Capture wins here only when both are true; the countdown row above
+        // still names the pause. `validateMenuItem` is what keeps the grey on
+        // at the next open; this line carries a menu that is already open.
         previewItem?.isEnabled = !captureHold.isCaptured
     }
 
@@ -292,8 +298,8 @@ final class MenuActions: NSObject {
 
     /// Flips Hide While Sharing. Turning it off drops the latch on the spot —
     /// `observe` with `enabled: false` is not a rising edge, so nothing is
-    /// dismissed — and the next tick continues the frozen remainder. Turning it
-    /// on samples immediately, so a share already in progress dismisses on that
+    /// hidden — and the next tick continues the frozen remainder. Turning it
+    /// on samples immediately, so a share already in progress is hidden on that
     /// edge instead of waiting for the next tick.
     @objc func toggleSuppressWhileCaptured(_ sender: Any?) {
         captureStore.setEnabled(!captureStore.isEnabled())
@@ -302,7 +308,7 @@ final class MenuActions: NSObject {
     }
 
     @objc func preview(_ sender: Any?) {
-        // The disabled menu item is only the hint; this guard is the real
+        // The validated-off menu item is only the hint; this guard is the real
         // check, and the Config window's Preview button is guarded the same
         // way in its own closure.
         guard !captureHold.isCaptured else { return }
@@ -313,6 +319,20 @@ final class MenuActions: NSObject {
                 holdDuration: config.holdDuration
             )
         }
+    }
+
+    /// AppKit's menu validation hook — what makes a greyed-out Preview stick.
+    /// `menu.autoenablesItems` is on, and with no validation an item whose
+    /// target responds to its action is re-enabled every time the menu opens,
+    /// quietly undoing the `isEnabled` assignment in `updateTitles`. The click
+    /// guard in `preview` is still the real check. Every other action here
+    /// (pause durations, Resume Now, Config, Hide While Sharing, Start at
+    /// Login) stays clickable.
+    @objc func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if item.action == #selector(preview(_:)) {
+            return !captureHold.isCaptured
+        }
+        return true
     }
 
     @objc func openConfig(_ sender: Any?) {
